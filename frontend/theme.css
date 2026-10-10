@@ -1,0 +1,6 @@
+@import 'tailwindcss';
+@import 'konsta/vue/theme.css';
+@import './layout.css';
+@theme {
+  --color-brand-primary: #4caf50;
+}

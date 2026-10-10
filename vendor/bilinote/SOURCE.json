@@ -1,0 +1,6 @@
+{
+  "repository": "https://github.com/JefferyHcool/BiliNote",
+  "revision": "90940fde4d224d0f69ad99674f4af0a1ea52d3c4",
+  "file": "backend/app/downloaders/bilibili_dm_patch.py",
+  "usage": "download compatibility patch"
+}

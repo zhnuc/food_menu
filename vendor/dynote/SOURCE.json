@@ -1,0 +1,6 @@
+{
+  "repository": "https://github.com/Rimagination/dy-note",
+  "revision": "9a65f0d069cacdf5b0d7529f2ce1139d38072b47",
+  "file": "scripts/extract_douyin_text.py",
+  "usage": "Modified subset: collect_page_info and find_media_url only; ASR, CDP proxy and CLI removed"
+}

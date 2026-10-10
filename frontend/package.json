@@ -1,0 +1,19 @@
+{
+  "name": "together-kitchen-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@fontsource-variable/noto-sans-sc": "^5.3.0",
+    "konsta": "5.5.0",
+    "vue": "3.5.43"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "tailwindcss": "^4.0.0",
+    "vite": "8.3.4"
+  }
+}

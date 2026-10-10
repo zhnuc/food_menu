@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "count": 4,
+  "sourceSize": [
+    1254,
+    1254
+  ],
+  "sourceSha256": "dc475b432e20c38933a2ced93db885cc7d5449163e2471755c7f7413f0ac903f",
+  "sizes": [
+    128,
+    256
+  ],
+  "processing": {
+    "occupancy": 0.82,
+    "bodyAlpha": 128,
+    "alphaCutoff": 8,
+    "trimPadding": 4
+  },
+  "atlas": {
+    "file": "atlas.png",
+    "size": [
+      512,
+      512
+    ],
+    "columns": 2,
+    "rows": 2
+  },
+  "icons": [
+    {
+      "id": "pepper-pork",
+      "name": "青椒炒肉",
+      "row": 0,
+      "column": 0,
+      "files": {
+        "128": "128/pepper-pork.png",
+        "256": "256/pepper-pork.png"
+      },
+      "nativeSize": [
+        587,
+        433
+      ],
+      "sourceCell": [
+        0,
+        0,
+        627,
+        627
+      ],
+      "sourceTrim": [
+        28,
+        121,
+        615,
+        554
+      ],
+      "spriteRect": [
+        0,
+        0,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "tomato-egg",
+      "name": "番茄炒蛋",
+      "row": 0,
+      "column": 1,
+      "files": {
+        "128": "128/tomato-egg.png",
+        "256": "256/tomato-egg.png"
+      },
+      "nativeSize": [
+        588,
+        435
+      ],
+      "sourceCell": [
+        627,
+        0,
+        1254,
+        627
+      ],
+      "sourceTrim": [
+        12,
+        120,
+        600,
+        555
+      ],
+      "spriteRect": [
+        256,
+        0,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "garlic-broccoli",
+      "name": "蒜蓉西兰花",
+      "row": 1,
+      "column": 0,
+      "files": {
+        "128": "128/garlic-broccoli.png",
+        "256": "256/garlic-broccoli.png"
+      },
+      "nativeSize": [
+        589,
+        436
+      ],
+      "sourceCell": [
+        0,
+        627,
+        627,
+        1254
+      ],
+      "sourceTrim": [
+        27,
+        63,
+        616,
+        499
+      ],
+      "spriteRect": [
+        0,
+        256,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "default-dish",
+      "name": "成品菜占位图",
+      "row": 1,
+      "column": 1,
+      "files": {
+        "128": "128/default-dish.png",
+        "256": "256/default-dish.png"
+      },
+      "nativeSize": [
+        589,
+        436
+      ],
+      "sourceCell": [
+        627,
+        627,
+        1254,
+        1254
+      ],
+      "sourceTrim": [
+        11,
+        63,
+        600,
+        499
+      ],
+      "spriteRect": [
+        256,
+        256,
+        256,
+        256
+      ]
+    }
+  ]
+}

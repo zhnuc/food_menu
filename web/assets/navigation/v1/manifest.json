@@ -1,0 +1,222 @@
+{
+  "version": 1,
+  "count": 6,
+  "sourceSize": [
+    1536,
+    1024
+  ],
+  "sourceSha256": "976155442df5feadc59eb619aab17b9e5435a59943e70663755dd48077d251f9",
+  "sizes": [
+    128,
+    256
+  ],
+  "processing": {
+    "occupancy": 0.82,
+    "bodyAlpha": 128,
+    "alphaCutoff": 8,
+    "trimPadding": 4
+  },
+  "atlas": {
+    "file": "atlas.png",
+    "size": [
+      768,
+      512
+    ],
+    "columns": 3,
+    "rows": 2
+  },
+  "icons": [
+    {
+      "id": "kitchen",
+      "name": "厨房",
+      "row": 0,
+      "column": 0,
+      "files": {
+        "128": "128/kitchen.png",
+        "256": "256/kitchen.png"
+      },
+      "nativeSize": [
+        318,
+        388
+      ],
+      "sourceCell": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "sourceTrim": [
+        121,
+        75,
+        439,
+        463
+      ],
+      "spriteRect": [
+        0,
+        0,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "recipes",
+      "name": "菜谱",
+      "row": 0,
+      "column": 1,
+      "files": {
+        "128": "128/recipes.png",
+        "256": "256/recipes.png"
+      },
+      "nativeSize": [
+        444,
+        330
+      ],
+      "sourceCell": [
+        512,
+        0,
+        1024,
+        512
+      ],
+      "sourceTrim": [
+        35,
+        122,
+        479,
+        452
+      ],
+      "spriteRect": [
+        256,
+        0,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "meal",
+      "name": "这一餐",
+      "row": 0,
+      "column": 2,
+      "files": {
+        "128": "128/meal.png",
+        "256": "256/meal.png"
+      },
+      "nativeSize": [
+        411,
+        318
+      ],
+      "sourceCell": [
+        1024,
+        0,
+        1536,
+        512
+      ],
+      "sourceTrim": [
+        39,
+        126,
+        450,
+        444
+      ],
+      "spriteRect": [
+        512,
+        0,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "mine",
+      "name": "我的",
+      "row": 1,
+      "column": 0,
+      "files": {
+        "128": "128/mine.png",
+        "256": "256/mine.png"
+      },
+      "nativeSize": [
+        337,
+        422
+      ],
+      "sourceCell": [
+        0,
+        512,
+        512,
+        1024
+      ],
+      "sourceTrim": [
+        105,
+        22,
+        442,
+        444
+      ],
+      "spriteRect": [
+        0,
+        256,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "order",
+      "name": "美食家点菜",
+      "row": 1,
+      "column": 1,
+      "files": {
+        "128": "128/order.png",
+        "256": "256/order.png"
+      },
+      "nativeSize": [
+        333,
+        376
+      ],
+      "sourceCell": [
+        512,
+        512,
+        1024,
+        1024
+      ],
+      "sourceTrim": [
+        89,
+        42,
+        422,
+        418
+      ],
+      "spriteRect": [
+        256,
+        256,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "logo",
+      "name": "一起吃饭",
+      "row": 1,
+      "column": 2,
+      "files": {
+        "128": "128/logo.png",
+        "256": "256/logo.png"
+      },
+      "nativeSize": [
+        444,
+        312
+      ],
+      "sourceCell": [
+        1024,
+        512,
+        1536,
+        1024
+      ],
+      "sourceTrim": [
+        20,
+        76,
+        464,
+        388
+      ],
+      "spriteRect": [
+        512,
+        256,
+        256,
+        256
+      ]
+    }
+  ]
+}

@@ -1,0 +1,951 @@
+{
+  "version": 1,
+  "style": "A 清爽扁平",
+  "count": 30,
+  "canvasSizes": [
+    128,
+    256
+  ],
+  "sourceSize": [
+    1374,
+    1145
+  ],
+  "sourceSha256": "fd7c342714bcbdcaa8e6f4bf43f35ba516e8d28224fb301ba92533a1d5bf4743",
+  "atlas": {
+    "file": "atlas.png",
+    "size": [
+      1536,
+      1280
+    ],
+    "columns": 6,
+    "rows": 5
+  },
+  "icons": [
+    {
+      "id": "tomato",
+      "name": "番茄",
+      "category": "vegetable",
+      "aliases": [
+        "西红柿",
+        "小番茄",
+        "圣女果"
+      ],
+      "row": 0,
+      "column": 0,
+      "files": {
+        "128": "128/tomato.png",
+        "256": "256/tomato.png"
+      },
+      "sourceCell": [
+        0,
+        0,
+        238,
+        254
+      ],
+      "nativeSize": [
+        182,
+        180
+      ],
+      "spriteRect": [
+        0,
+        0,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "green-pepper",
+      "name": "青椒",
+      "category": "vegetable",
+      "aliases": [
+        "彩椒",
+        "甜椒",
+        "青辣椒"
+      ],
+      "row": 0,
+      "column": 1,
+      "files": {
+        "128": "128/green-pepper.png",
+        "256": "256/green-pepper.png"
+      },
+      "sourceCell": [
+        238,
+        0,
+        460,
+        254
+      ],
+      "nativeSize": [
+        162,
+        186
+      ],
+      "spriteRect": [
+        256,
+        0,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "broccoli",
+      "name": "西兰花",
+      "category": "vegetable",
+      "aliases": [
+        "绿花椰菜"
+      ],
+      "row": 0,
+      "column": 2,
+      "files": {
+        "128": "128/broccoli.png",
+        "256": "256/broccoli.png"
+      },
+      "sourceCell": [
+        460,
+        0,
+        703,
+        254
+      ],
+      "nativeSize": [
+        200,
+        187
+      ],
+      "spriteRect": [
+        512,
+        0,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "potato",
+      "name": "土豆",
+      "category": "vegetable",
+      "aliases": [
+        "马铃薯"
+      ],
+      "row": 0,
+      "column": 3,
+      "files": {
+        "128": "128/potato.png",
+        "256": "256/potato.png"
+      },
+      "sourceCell": [
+        703,
+        0,
+        926,
+        254
+      ],
+      "nativeSize": [
+        176,
+        162
+      ],
+      "spriteRect": [
+        768,
+        0,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "carrot",
+      "name": "胡萝卜",
+      "category": "vegetable",
+      "aliases": [
+        "红萝卜"
+      ],
+      "row": 0,
+      "column": 4,
+      "files": {
+        "128": "128/carrot.png",
+        "256": "256/carrot.png"
+      },
+      "sourceCell": [
+        926,
+        0,
+        1156,
+        254
+      ],
+      "nativeSize": [
+        178,
+        199
+      ],
+      "spriteRect": [
+        1024,
+        0,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "cucumber",
+      "name": "黄瓜",
+      "category": "vegetable",
+      "aliases": [],
+      "row": 0,
+      "column": 5,
+      "files": {
+        "128": "128/cucumber.png",
+        "256": "256/cucumber.png"
+      },
+      "sourceCell": [
+        1156,
+        0,
+        1374,
+        254
+      ],
+      "nativeSize": [
+        188,
+        149
+      ],
+      "spriteRect": [
+        1280,
+        0,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "cabbage",
+      "name": "白菜",
+      "category": "vegetable",
+      "aliases": [
+        "大白菜",
+        "娃娃菜"
+      ],
+      "row": 1,
+      "column": 0,
+      "files": {
+        "128": "128/cabbage.png",
+        "256": "256/cabbage.png"
+      },
+      "sourceCell": [
+        0,
+        254,
+        238,
+        468
+      ],
+      "nativeSize": [
+        160,
+        205
+      ],
+      "spriteRect": [
+        0,
+        256,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "mushroom",
+      "name": "蘑菇",
+      "category": "vegetable",
+      "aliases": [
+        "香菇",
+        "口蘑",
+        "菌菇"
+      ],
+      "row": 1,
+      "column": 1,
+      "files": {
+        "128": "128/mushroom.png",
+        "256": "256/mushroom.png"
+      },
+      "sourceCell": [
+        238,
+        254,
+        460,
+        468
+      ],
+      "nativeSize": [
+        208,
+        160
+      ],
+      "spriteRect": [
+        256,
+        256,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "pork",
+      "name": "猪肉",
+      "category": "meat",
+      "aliases": [
+        "五花肉",
+        "里脊",
+        "猪里脊",
+        "肉末",
+        "猪肉末"
+      ],
+      "row": 1,
+      "column": 2,
+      "files": {
+        "128": "128/pork.png",
+        "256": "256/pork.png"
+      },
+      "sourceCell": [
+        460,
+        254,
+        703,
+        468
+      ],
+      "nativeSize": [
+        187,
+        159
+      ],
+      "spriteRect": [
+        512,
+        256,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "beef",
+      "name": "牛肉",
+      "category": "meat",
+      "aliases": [
+        "牛腩",
+        "牛里脊",
+        "牛肉末"
+      ],
+      "row": 1,
+      "column": 3,
+      "files": {
+        "128": "128/beef.png",
+        "256": "256/beef.png"
+      },
+      "sourceCell": [
+        703,
+        254,
+        926,
+        468
+      ],
+      "nativeSize": [
+        200,
+        159
+      ],
+      "spriteRect": [
+        768,
+        256,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "beef-roll",
+      "name": "肥牛",
+      "category": "meat",
+      "aliases": [
+        "肥牛卷",
+        "牛肉卷"
+      ],
+      "row": 1,
+      "column": 4,
+      "files": {
+        "128": "128/beef-roll.png",
+        "256": "256/beef-roll.png"
+      },
+      "sourceCell": [
+        926,
+        254,
+        1156,
+        468
+      ],
+      "nativeSize": [
+        201,
+        170
+      ],
+      "spriteRect": [
+        1024,
+        256,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "chicken",
+      "name": "鸡肉",
+      "category": "meat",
+      "aliases": [
+        "鸡胸肉",
+        "鸡腿",
+        "鸡腿肉",
+        "鸡翅"
+      ],
+      "row": 1,
+      "column": 5,
+      "files": {
+        "128": "128/chicken.png",
+        "256": "256/chicken.png"
+      },
+      "sourceCell": [
+        1156,
+        254,
+        1374,
+        468
+      ],
+      "nativeSize": [
+        177,
+        165
+      ],
+      "spriteRect": [
+        1280,
+        256,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "shrimp",
+      "name": "虾",
+      "category": "aquatic",
+      "aliases": [
+        "鲜虾",
+        "虾仁",
+        "大虾"
+      ],
+      "row": 2,
+      "column": 0,
+      "files": {
+        "128": "128/shrimp.png",
+        "256": "256/shrimp.png"
+      },
+      "sourceCell": [
+        0,
+        468,
+        238,
+        685
+      ],
+      "nativeSize": [
+        203,
+        201
+      ],
+      "spriteRect": [
+        0,
+        512,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "shrimp-paste",
+      "name": "虾滑",
+      "category": "aquatic",
+      "aliases": [],
+      "row": 2,
+      "column": 1,
+      "files": {
+        "128": "128/shrimp-paste.png",
+        "256": "256/shrimp-paste.png"
+      },
+      "sourceCell": [
+        238,
+        468,
+        460,
+        685
+      ],
+      "nativeSize": [
+        213,
+        172
+      ],
+      "spriteRect": [
+        256,
+        512,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "egg",
+      "name": "鸡蛋",
+      "category": "other",
+      "aliases": [
+        "鸡蛋液",
+        "蛋液"
+      ],
+      "row": 2,
+      "column": 2,
+      "files": {
+        "128": "128/egg.png",
+        "256": "256/egg.png"
+      },
+      "sourceCell": [
+        460,
+        468,
+        703,
+        685
+      ],
+      "nativeSize": [
+        161,
+        175
+      ],
+      "spriteRect": [
+        512,
+        512,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "tofu",
+      "name": "豆腐",
+      "category": "other",
+      "aliases": [
+        "嫩豆腐",
+        "老豆腐",
+        "北豆腐",
+        "南豆腐"
+      ],
+      "row": 2,
+      "column": 3,
+      "files": {
+        "128": "128/tofu.png",
+        "256": "256/tofu.png"
+      },
+      "sourceCell": [
+        703,
+        468,
+        926,
+        685
+      ],
+      "nativeSize": [
+        188,
+        162
+      ],
+      "spriteRect": [
+        768,
+        512,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "rice",
+      "name": "大米",
+      "category": "staple",
+      "aliases": [
+        "米",
+        "糯米"
+      ],
+      "row": 2,
+      "column": 4,
+      "files": {
+        "128": "128/rice.png",
+        "256": "256/rice.png"
+      },
+      "sourceCell": [
+        926,
+        468,
+        1156,
+        685
+      ],
+      "nativeSize": [
+        212,
+        158
+      ],
+      "spriteRect": [
+        1024,
+        512,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "noodles",
+      "name": "面条",
+      "category": "staple",
+      "aliases": [
+        "挂面",
+        "鲜面",
+        "面"
+      ],
+      "row": 2,
+      "column": 5,
+      "files": {
+        "128": "128/noodles.png",
+        "256": "256/noodles.png"
+      },
+      "sourceCell": [
+        1156,
+        468,
+        1374,
+        685
+      ],
+      "nativeSize": [
+        193,
+        167
+      ],
+      "spriteRect": [
+        1280,
+        512,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "flour",
+      "name": "面粉",
+      "category": "staple",
+      "aliases": [
+        "小麦粉",
+        "低筋面粉",
+        "高筋面粉",
+        "中筋面粉"
+      ],
+      "row": 3,
+      "column": 0,
+      "files": {
+        "128": "128/flour.png",
+        "256": "256/flour.png"
+      },
+      "sourceCell": [
+        0,
+        685,
+        238,
+        919
+      ],
+      "nativeSize": [
+        161,
+        188
+      ],
+      "spriteRect": [
+        0,
+        768,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "garlic",
+      "name": "蒜",
+      "category": "seasoning",
+      "aliases": [
+        "大蒜",
+        "蒜瓣",
+        "蒜末",
+        "蒜蓉"
+      ],
+      "row": 3,
+      "column": 1,
+      "files": {
+        "128": "128/garlic.png",
+        "256": "256/garlic.png"
+      },
+      "sourceCell": [
+        238,
+        685,
+        460,
+        919
+      ],
+      "nativeSize": [
+        186,
+        184
+      ],
+      "spriteRect": [
+        256,
+        768,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "scallion",
+      "name": "葱",
+      "category": "seasoning",
+      "aliases": [
+        "小葱",
+        "香葱",
+        "大葱",
+        "葱花"
+      ],
+      "row": 3,
+      "column": 2,
+      "files": {
+        "128": "128/scallion.png",
+        "256": "256/scallion.png"
+      },
+      "sourceCell": [
+        460,
+        685,
+        703,
+        919
+      ],
+      "nativeSize": [
+        196,
+        196
+      ],
+      "spriteRect": [
+        512,
+        768,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "soy-sauce",
+      "name": "生抽",
+      "category": "seasoning",
+      "aliases": [
+        "老抽",
+        "酱油",
+        "味极鲜"
+      ],
+      "row": 3,
+      "column": 3,
+      "files": {
+        "128": "128/soy-sauce.png",
+        "256": "256/soy-sauce.png"
+      },
+      "sourceCell": [
+        703,
+        685,
+        926,
+        919
+      ],
+      "nativeSize": [
+        115,
+        207
+      ],
+      "spriteRect": [
+        768,
+        768,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "salt",
+      "name": "盐",
+      "category": "seasoning",
+      "aliases": [
+        "食盐",
+        "海盐"
+      ],
+      "row": 3,
+      "column": 4,
+      "files": {
+        "128": "128/salt.png",
+        "256": "256/salt.png"
+      },
+      "sourceCell": [
+        926,
+        685,
+        1156,
+        919
+      ],
+      "nativeSize": [
+        109,
+        174
+      ],
+      "spriteRect": [
+        1024,
+        768,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "cooking-oil",
+      "name": "食用油",
+      "category": "seasoning",
+      "aliases": [
+        "油",
+        "植物油",
+        "花生油",
+        "菜籽油",
+        "橄榄油"
+      ],
+      "row": 3,
+      "column": 5,
+      "files": {
+        "128": "128/cooking-oil.png",
+        "256": "256/cooking-oil.png"
+      },
+      "sourceCell": [
+        1156,
+        685,
+        1374,
+        919
+      ],
+      "nativeSize": [
+        102,
+        207
+      ],
+      "spriteRect": [
+        1280,
+        768,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "category-vegetable",
+      "name": "蔬菜",
+      "category": "fallback",
+      "aliases": [],
+      "row": 4,
+      "column": 0,
+      "files": {
+        "128": "128/category-vegetable.png",
+        "256": "256/category-vegetable.png"
+      },
+      "sourceCell": [
+        0,
+        919,
+        238,
+        1145
+      ],
+      "nativeSize": [
+        204,
+        190
+      ],
+      "spriteRect": [
+        0,
+        1024,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "category-meat",
+      "name": "肉类",
+      "category": "fallback",
+      "aliases": [],
+      "row": 4,
+      "column": 1,
+      "files": {
+        "128": "128/category-meat.png",
+        "256": "256/category-meat.png"
+      },
+      "sourceCell": [
+        238,
+        919,
+        460,
+        1145
+      ],
+      "nativeSize": [
+        194,
+        180
+      ],
+      "spriteRect": [
+        256,
+        1024,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "category-aquatic",
+      "name": "水产",
+      "category": "fallback",
+      "aliases": [],
+      "row": 4,
+      "column": 2,
+      "files": {
+        "128": "128/category-aquatic.png",
+        "256": "256/category-aquatic.png"
+      },
+      "sourceCell": [
+        460,
+        919,
+        703,
+        1145
+      ],
+      "nativeSize": [
+        229,
+        144
+      ],
+      "spriteRect": [
+        512,
+        1024,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "category-staple",
+      "name": "主食",
+      "category": "fallback",
+      "aliases": [],
+      "row": 4,
+      "column": 3,
+      "files": {
+        "128": "128/category-staple.png",
+        "256": "256/category-staple.png"
+      },
+      "sourceCell": [
+        703,
+        919,
+        926,
+        1145
+      ],
+      "nativeSize": [
+        198,
+        183
+      ],
+      "spriteRect": [
+        768,
+        1024,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "category-seasoning",
+      "name": "调味",
+      "category": "fallback",
+      "aliases": [],
+      "row": 4,
+      "column": 4,
+      "files": {
+        "128": "128/category-seasoning.png",
+        "256": "256/category-seasoning.png"
+      },
+      "sourceCell": [
+        926,
+        919,
+        1156,
+        1145
+      ],
+      "nativeSize": [
+        174,
+        162
+      ],
+      "spriteRect": [
+        1024,
+        1024,
+        256,
+        256
+      ]
+    },
+    {
+      "id": "category-other",
+      "name": "其他",
+      "category": "fallback",
+      "aliases": [],
+      "row": 4,
+      "column": 5,
+      "files": {
+        "128": "128/category-other.png",
+        "256": "256/category-other.png"
+      },
+      "sourceCell": [
+        1156,
+        919,
+        1374,
+        1145
+      ],
+      "nativeSize": [
+        159,
+        168
+      ],
+      "spriteRect": [
+        1280,
+        1024,
+        256,
+        256
+      ]
+    }
+  ]
+}
