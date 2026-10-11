@@ -58,6 +58,7 @@ class Accounts:
                 db.execute("CREATE INDEX IF NOT EXISTS kitchen_stocks_location ON kitchen_stocks(household_id,((data::jsonb)->>'space'))")
                 db.execute("ALTER TABLE kitchen_stocks ADD COLUMN IF NOT EXISTS quantity NUMERIC GENERATED ALWAYS AS (((data::jsonb)->>'quantity')::numeric) STORED")
                 db.execute('INSERT INTO schema_migrations VALUES (2,?) ON CONFLICT(version) DO NOTHING', (time.time(),))
+            db.execute('INSERT INTO schema_migrations VALUES (3,?) ON CONFLICT(version) DO NOTHING', (time.time(),))
 
     @contextmanager
     def connect(self):

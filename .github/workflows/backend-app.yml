@@ -33,6 +33,19 @@ jobs:
         env:
           TEST_POSTGRES_URL: postgresql://postgres:test-only-password@127.0.0.1:5432/food_menu_check
       - run: python scripts/build_offline.py
+      - name: Build deployment image
+        run: docker build -t together-kitchen:test .
+      - name: Validate deployment and container startup
+        run: |
+          cp deploy/production.env.example deploy/production.env
+          POSTGRES_PASSWORD=test-only APP_DOMAIN=test.invalid docker compose -f deploy/compose.yaml config --quiet
+          docker run -d --name kitchen-smoke -e HOST=0.0.0.0 -e DOUYIN_BROWSER_CHANNEL= -p 127.0.0.1:8767:8767 together-kitchen:test
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8767/api/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs kitchen-smoke
+          exit 1
   android:
     runs-on: ubuntu-latest
     steps:

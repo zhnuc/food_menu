@@ -44,7 +44,7 @@
     if(!data.user){await client.expired();return;}
     const wasOffline=client.offline;client.offline=false;client.available=true;
     const changed=client.household?.id!==data.household.id || client.revision!==data.revision;
-    if(!changed && JSON.stringify([client.user,client.members])===JSON.stringify([data.user,data.members])){if(wasOffline)hooks.render();return;}
+    if(!changed && JSON.stringify([client.user,client.members])===JSON.stringify([data.user,data.members])){if(wasOffline){hooks.render();window.PrivateAssets?.prefetch({...data,snapshot:confirmed});}return;}
     // Do not replace an open form; its next save still checks the server revision.
     if(changed && document.getElementById('sheet').open)return;
     adopt(data,changed);
