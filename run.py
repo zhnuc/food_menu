@@ -1,4 +1,4 @@
-"""Start the recipe backend and its local Antigravity gateway."""
+"""Start ASGI, a durable worker and the optional local model gateway."""
 import argparse
 import json
 import os
@@ -56,6 +56,19 @@ def main():
         address = 'http://127.0.0.1:' + str(port)
         process = launch([sys.executable, str(ROOT / 'server.py')], ROOT, 'recipes', address + '/api/status')
         if process: children.append(process)
+        heartbeat=ROOT/'.data/worker-heartbeat'
+        if not heartbeat.exists() or time.time()-heartbeat.stat().st_mtime>45:
+            LOGS.mkdir(parents=True,exist_ok=True)
+            with (LOGS/'worker.log').open('a',encoding='utf-8') as log:
+                process=subprocess.Popen([sys.executable,str(ROOT/'worker.py')],cwd=ROOT,stdout=log,stderr=log,
+                    env=dict(os.environ,PYTHONIOENCODING='utf-8',WORKER_HEARTBEAT=str(heartbeat)),
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
+            children.append(process)
+            for _ in range(100):
+                if heartbeat.exists() and time.time()-heartbeat.stat().st_mtime<10:break
+                if process.poll() is not None:raise RuntimeError('任务 worker 启动失败，详见 .data/logs/worker.log')
+                time.sleep(.2)
+            else:raise RuntimeError('任务 worker 启动超时')
         (ROOT / '.data/service-pids.json').write_text(json.dumps([p.pid for p in children]), encoding='utf-8')
         print('一起吃饭：' + address, flush=True)
         if args.background:

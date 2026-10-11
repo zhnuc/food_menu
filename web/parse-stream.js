@@ -7,20 +7,20 @@
     }
     if (!(response.headers.get('content-type') || '').includes('application/x-ndjson')) {
       const data = await response.json();
-      onEvent({type: 'source', evidence: data.evidence || [], media: data.media || {}});
-      onEvent({type: 'recipes', recipes: data.recipes || []});
-      onEvent({type: 'done', recipeCount: data.recipes?.length || 0, warnings: data.warnings, timings: data.timings});
+      await onEvent({type: 'source', evidence: data.evidence || [], media: data.media || {}});
+      await onEvent({type: 'recipes', recipes: data.recipes || []});
+      await onEvent({type: 'done', recipeCount: data.recipes?.length || 0, warnings: data.warnings, timings: data.timings});
       return;
     }
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '', done = false;
-    function dispatch(line) {
+    async function dispatch(line) {
       if (!line.trim()) return;
       const event = JSON.parse(line);
       if (event.type === 'error') throw Error(event.error);
       if (event.type === 'done') done = true;
-      onEvent(event);
+      await onEvent(event);
     }
     try {
       while (true) {
@@ -28,12 +28,12 @@
         buffer += decoder.decode(chunk.value || new Uint8Array(), {stream: !chunk.done});
         let end;
         while ((end = buffer.indexOf('\n')) >= 0) {
-          dispatch(buffer.slice(0, end));
+          await dispatch(buffer.slice(0, end));
           buffer = buffer.slice(end + 1);
         }
         if (chunk.done) break;
       }
-      dispatch(buffer);
+      await dispatch(buffer);
       if (!done) throw Error('连接中断，已生成的卡片已保留，可重试补齐。');
     } finally {
       reader.releaseLock();

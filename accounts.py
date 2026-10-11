@@ -1,14 +1,17 @@
-"""Local account sessions and household snapshots, independent of model services."""
+"""Account sessions and transactional household commands, independent of AI."""
 import base64
 import hashlib
 import hmac
 import json
 import re
 import secrets
-import sqlite3
 import time
+import kitchen_service as kitchen
+import kitchen_storage
 from contextlib import contextmanager
 from pathlib import Path
+from database import Database, integrity_errors
+import file_storage
 
 
 class AccountError(ValueError):
@@ -19,9 +22,12 @@ class AccountError(ValueError):
 
 class Accounts:
     def __init__(self, path):
-        self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path = Path(path) if not str(path).startswith(('postgres://','postgresql://')) else None
+        self.database = Database(path)
+        self.files = file_storage.Files()
         with self.connect() as db:
+            if self.database.postgres:
+                db.execute('SELECT pg_advisory_xact_lock(741208130)')
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS households (
                     id TEXT PRIMARY KEY, name TEXT NOT NULL, invite TEXT UNIQUE NOT NULL,
@@ -35,17 +41,28 @@ class Accounts:
                 CREATE TABLE IF NOT EXISTS attempts (
                     key TEXT PRIMARY KEY, count INTEGER NOT NULL, since REAL NOT NULL);
             ''')
+            kitchen_storage.initialize(db)
+            file_storage.initialize(db)
+            from job_service import initialize as initialize_jobs
+            initialize_jobs(db)
+            db.execute('BEGIN IMMEDIATE')
+            for row in db.execute('SELECT id,snapshot FROM households').fetchall():
+                if not kitchen_storage.exists(db, row['id']):
+                    bundle = json.loads(self.snapshot(json.loads(row['snapshot'])))
+                    kitchen_storage.write(db, row['id'], bundle)
+            db.execute('CREATE INDEX IF NOT EXISTS users_household ON users(household,id)')
+            db.execute('CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires)')
+            db.execute('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at REAL NOT NULL)')
+            db.execute('INSERT INTO schema_migrations VALUES (1,?) ON CONFLICT(version) DO NOTHING', (time.time(),))
+            if self.database.postgres:
+                db.execute("CREATE INDEX IF NOT EXISTS kitchen_stocks_location ON kitchen_stocks(household_id,((data::jsonb)->>'space'))")
+                db.execute("ALTER TABLE kitchen_stocks ADD COLUMN IF NOT EXISTS quantity NUMERIC GENERATED ALWAYS AS (((data::jsonb)->>'quantity')::numeric) STORED")
+                db.execute('INSERT INTO schema_migrations VALUES (2,?) ON CONFLICT(version) DO NOTHING', (time.time(),))
 
     @contextmanager
     def connect(self):
-        db = sqlite3.connect(self.path, timeout=15)
-        db.row_factory = sqlite3.Row
-        db.execute('PRAGMA foreign_keys=ON')
-        try:
-            with db:
-                yield db
-        finally:
-            db.close()
+        with self.database.connect() as db:
+            yield db
 
     @staticmethod
     def password_hash(password, salt=None):
@@ -68,6 +85,7 @@ class Accounts:
     def avatar(value):
         if not isinstance(value, str) or len(value) > 300000:
             raise AccountError('头像过大，请重新选择')
+        if re.fullmatch(r'/api/files/[a-f0-9]{32}',value):return value
         if value:
             if not re.fullmatch(r'data:image/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+=*', value):
                 raise AccountError('请选择有效的头像图片')
@@ -115,7 +133,14 @@ class Accounts:
                 raise AccountError('食材库存数据不正确')
             ids.add(row['id'])
         shared = {key: state[key] for key in ('version', 'stocks', 'spaces', 'records', 'operations', 'meal')}
-        encoded = json.dumps({'state': shared, 'recipeData': value['recipeData']}, ensure_ascii=False, allow_nan=False)
+        try:
+            kitchen.validate_bundle({'state': shared, 'recipeData': value['recipeData']})
+        except (kitchen.KitchenError, KeyError, TypeError, ValueError) as exc:
+            raise AccountError(str(exc) if isinstance(exc, kitchen.KitchenError) else '家庭数据格式不正确')
+        try:
+            encoded = json.dumps({'state': shared, 'recipeData': value['recipeData']}, ensure_ascii=False, allow_nan=False)
+        except (TypeError, ValueError):
+            raise AccountError('家庭数据格式不正确')
         if len(encoded.encode()) > 12_000_000:
             raise AccountError('家庭数据过大，请先导出照片或菜谱备份')
         return encoded
@@ -123,13 +148,12 @@ class Accounts:
     def throttle(self, key):
         now = time.time()
         with self.connect() as db:
-            row = db.execute('SELECT * FROM attempts WHERE key=?', (key,)).fetchone()
-            if row and now-row['since'] < 900 and row['count'] >= 15:
+            row = db.execute('''INSERT INTO attempts VALUES (?,1,?) ON CONFLICT(key) DO UPDATE SET
+                count=CASE WHEN ?-attempts.since>=900 THEN 1 ELSE attempts.count+1 END,
+                since=CASE WHEN ?-attempts.since>=900 THEN excluded.since ELSE attempts.since END
+                RETURNING count,since''', (key,now,now,now)).fetchone()
+            if row['count'] > 15:
                 raise AccountError('尝试次数较多，请15分钟后再试', 429)
-            if not row or now-row['since'] >= 900:
-                db.execute('INSERT OR REPLACE INTO attempts VALUES (?,1,?)', (key, now))
-            else:
-                db.execute('UPDATE attempts SET count=count+1 WHERE key=?', (key,))
 
     def session(self, db, user_id):
         token = secrets.token_urlsafe(32)
@@ -154,8 +178,11 @@ class Accounts:
                 db.execute('INSERT INTO households VALUES (?,?,?,?,1)',
                            (household, nickname+'的小厨房', secrets.token_hex(6).upper(), snapshot))
                 db.execute('INSERT INTO users VALUES (?,?,?,?,?,?)', (user, login.lower(), nickname, encoded, '', household))
+                bundle=json.loads(snapshot)
+                self.files.migrate_bundle(db,{'id':user,'household':household},bundle)
+                kitchen_storage.write(db, household, bundle)
                 token = self.session(db, user)
-            except sqlite3.IntegrityError:
+            except integrity_errors():
                 raise AccountError('这个账号已经注册了')
         return token
 
@@ -188,12 +215,16 @@ class Accounts:
 
     def current(self, token):
         with self.connect() as db:
+            db.execute('BEGIN')
             user = self.user(db, token)
-            household = db.execute('SELECT * FROM households WHERE id=?', (user['household'],)).fetchone()
-            members = db.execute('SELECT * FROM users WHERE household=? ORDER BY rowid', (household['id'],)).fetchall()
-            return {'user': self.public(user), 'household': {key: household[key] for key in ('id', 'name', 'invite')},
-                    'members': [self.public(row) for row in members], 'revision': household['revision'],
-                    'snapshot': json.loads(household['snapshot'])}
+            return self.current_in_transaction(db, user)
+
+    def current_in_transaction(self, db, user):
+        household = db.execute('SELECT * FROM households WHERE id=?', (user['household'],)).fetchone()
+        members = db.execute('SELECT * FROM users WHERE household=? ORDER BY id', (household['id'],)).fetchall()
+        return {'user': self.public(user), 'household': {key: household[key] for key in ('id', 'name', 'invite')},
+                'members': [self.public(row) for row in members], 'revision': household['revision'],
+                'snapshot': kitchen_storage.read(db, household['id']), 'schemaVersion': 1}
 
     def logout(self, token):
         with self.connect() as db:
@@ -202,7 +233,9 @@ class Accounts:
     def profile(self, token, payload):
         nickname, avatar = self.nickname(payload.get('nickname')), self.avatar(payload.get('avatar', ''))
         with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
             user = self.user(db, token)
+            avatar=self.files.externalize(db,user,avatar,'avatar')
             db.execute('UPDATE users SET nickname=?,avatar=? WHERE id=?', (nickname, avatar, user['id']))
         return self.current(token)
 
@@ -213,6 +246,8 @@ class Accounts:
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             user = self.user(db, token)
+            if self.database.postgres:
+                user = self.database.lock_user(db, user['id'])
             household = db.execute('SELECT id FROM households WHERE invite=?', (code.strip().upper(),)).fetchone()
             if not household:
                 raise AccountError('邀请码不存在，请向家人确认')
@@ -220,26 +255,51 @@ class Accounts:
         return self.current(token)
 
     def save(self, token, payload):
-        encoded = self.snapshot(payload.get('snapshot'))
+        with self.connect() as db:
+            self.user(db, token)
+        raise AccountError('整份覆盖接口已停用，请刷新页面后通过具体操作保存', 410)
+
+    def command(self, token, payload):
+        identity = payload.get('id')
+        kind, arguments, role = payload.get('kind'), payload.get('payload', {}), payload.get('role')
+        if not isinstance(identity, str) or not 8 <= len(identity) <= 120 or not isinstance(kind, str) or not isinstance(arguments, dict):
+            raise AccountError('操作格式不正确')
         revision = payload.get('revision')
-        if type(revision) is not int:
+        if type(revision) is not int or revision < 1:
             raise AccountError('厨房数据版本不正确')
+        try:
+            request_hash = hashlib.sha256(kitchen_storage.encode({'kind': kind, 'payload': arguments,
+                'role': role, 'mealId': payload.get('mealId')}).encode()).hexdigest()
+        except (TypeError, ValueError):
+            raise AccountError('操作格式不正确')
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             user = self.user(db, token)
-            old = db.execute('SELECT snapshot,revision FROM households WHERE id=?', (user['household'],)).fetchone()
-            if old['revision'] != revision:
-                raise AccountError('家人刚更新了厨房，已刷新，请重新操作', 409)
-            previous = json.loads(old['snapshot'])['state']['meal']
-            current = json.loads(encoded)['state']['meal']
-            if previous['id'] == current['id'] and previous['status'] != 'draft' and (
-                    previous['selections'] != current['selections'] or previous['dishes'] != current['dishes']):
-                raise AccountError('本餐菜单已固定，暂无法点菜', 409)
-            if previous['id'] != current['id'] and previous['status'] not in ('done', 'cancelled'):
-                raise AccountError('请先完成或取消当前这餐', 409)
-            allowed = {'draft': ('draft','locked','cancelled'), 'locked': ('locked','cooking','cancelled'),
-                       'cooking': ('cooking','done','cancelled'), 'done': ('done',), 'cancelled': ('cancelled',)}
-            if previous['id'] == current['id'] and current['status'] not in allowed[previous['status']]:
-                raise AccountError('餐次状态已变化，请刷新后重试', 409)
-            db.execute('UPDATE households SET snapshot=?,revision=revision+1 WHERE id=?', (encoded, user['household']))
-        return {'revision': revision+1}
+            if self.database.postgres:
+                user = self.database.lock_user(db, user['id'])
+            household = user['household']
+            self.database.lock_household(db, household)
+            previous = db.execute('SELECT * FROM kitchen_commands WHERE household_id=? AND id=?', (household, identity)).fetchone()
+            if previous:
+                if previous['actor_id'] != user['id'] or previous['request_hash'] != request_hash:
+                    raise AccountError('操作编号已被其他请求使用', 409)
+                result, duplicate = json.loads(previous['result']), True
+            else:
+                old = db.execute('SELECT revision FROM households WHERE id=?', (household,)).fetchone()
+                if old['revision'] != revision:
+                    raise AccountError('家人刚更新了厨房，请刷新后重新操作', 409)
+                bundle = kitchen_storage.read(db, household)
+                try:
+                    result = kitchen.apply(bundle, kind, arguments, role, payload.get('mealId'))
+                    self.snapshot(bundle)
+                    self.files.migrate_bundle(db,user,bundle)
+                except kitchen.KitchenError as exc:
+                    raise AccountError(str(exc), exc.status)
+                kitchen_storage.write(db, household, bundle)
+                db.execute('UPDATE households SET revision=revision+1 WHERE id=?', (household,))
+                db.execute('INSERT INTO kitchen_commands VALUES (?,?,?,?,?,?,?,?)',
+                           (household, identity, user['id'], kind, request_hash, revision+1,
+                            kitchen_storage.encode(result), time.time()))
+                duplicate = False
+            response = {**self.current_in_transaction(db, user), 'result': result, 'duplicate': duplicate}
+        return response

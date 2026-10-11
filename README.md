@@ -10,9 +10,9 @@
 
 打开 http://127.0.0.1:8767 。后台运行可加 `--background`。启动器复用已运行的服务，只管理自己启动的进程。
 
-新环境安装：`uv venv .venv`，然后 `uv pip install --python .venv/Scripts/python.exe -r requirements.txt`。Python 主程序声明四项依赖：yt-dlp、imageio-ffmpeg、Playwright、Pillow；当前连带依赖总共7个包。Pillow只负责缩放、编号和拼图，不运行本地识别模型；抖音浏览器备用路线使用已安装的 Chrome。
+新环境安装：`uv venv .venv`，然后 `uv pip install --python .venv/Scripts/python.exe -r requirements.txt`。后端使用 FastAPI/Uvicorn、PostgreSQL 驱动和原有媒体/图像依赖。Pillow 负责图片处理，不运行本地识别模型；服务器可执行 `python -m playwright install --with-deps chromium` 并设置 `DOUYIN_BROWSER_CHANNEL=`，使用独立 Chromium。
 
-本机已保留 AIClient2API 的 Node.js 生产依赖与 Google 授权，启动器同时启动该网关。只启动主后端可用 `.venv/Scripts/python.exe server.py`，网关需单独保持运行。
+本机可复用已有 AIClient2API 网关，启动器同时启动 API 和持久化任务 worker。只运行 `server.py` 时还需单独运行 `worker.py`。服务器使用自己的模型接口配置，不依赖本机个人授权。
 
 GitHub 仓库不包含本机 `.env`、账号数据库、下载媒体、个人授权网关目录或运行缓存。新克隆后先复制 `.env.example` 为 `.env`，配置自己的模型接口和密钥，再运行 `server.py`；账号、厨房与手写菜谱不依赖模型服务。若需要使用 `run.py` 的本机网关启动路线，请自行安装上述 AIClient2API 并配置个人授权。运行截图和模型原始验证结果仅保留在本机，应用使用的图标、插画和字体已随源码提交。
 
@@ -20,8 +20,13 @@ GitHub 仓库不包含本机 `.env`、账号数据库、下载媒体、个人授
 
 ```text
 web/                     手机界面、菜谱流式展示、账号与家庭同步；保留本机体验
-server.py                菜谱与账号API、静态文件服务
-accounts.py              SQLite账号、密码散列、会话、家庭数据与版本检查
+server.py/application.py ASGI 入口、账号/业务/任务 API、静态服务
+accounts.py/database.py  账号、会话、家庭事务；SQLite/PostgreSQL
+job_service.py/worker.py 持久化任务、事件、租约恢复、模型用量
+file_storage.py          家庭私有图片与独立上传
+database_tools.py        私有数据库及图片备份、恢复、迁移
+kitchen_service.py       服务端库存、预留、撤销与餐次业务规则
+kitchen_storage.py       家庭实体存储、迁移与幂等回执
 account_http.py          账号HTTP路由、登录Cookie与同源写入检查
 recipe_batches.py        独立菜并行、归属不明整篇整理、每组缓存、合并结果
 ai.py                    唯一模型配置、HTTP调用、JSON响应解析
@@ -35,7 +40,7 @@ services/AIClient2API/    独立Antigravity网关：授权刷新、Clash代理�
 run.py                   一条命令启动后端和网关
 ```
 
-主后端是 Python 标准库 HTTP 服务，账号与家庭数据使用标准库SQLite，默认保存到`.data/accounts.sqlite3`；不增加数据库安装依赖。AIClient2API仍使用上游授权与协议核心，与产品账号系统各自独立。
+默认本机数据保存在 `.data/accounts.sqlite3`；正式环境配置 `DATABASE_URL` 使用 PostgreSQL。API 和 worker 分开运行，实体局部更新、幂等业务回执和家庭权限在服务器处理。客户端 IndexedDB 保存菜谱、记录、账号范围图片副本与草稿。部署、私有备份和原生 App 构建见 [部署说明](docs/deployment.md)。
 
 ## 账号与家庭
 
@@ -43,9 +48,11 @@ run.py                   一条命令启动后端和网关
 
 服务端验证Cookie对应的账号及家庭成员关系，不接收客户端指定的家庭ID作为写入权限。登录会话30天有效，退出立即撤销当前会话。密码采用带随机盐的scrypt，会话Cookie为HttpOnly、SameSite=Strict；密码和登录令牌不写入浏览器localStorage。实现依据：[OWASP密码存储](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)、[会话管理](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)。
 
-家庭更改自动保存，前台约每4秒检查更新；相同版本只返回账号和家庭信息，不重复下载照片。多人同时更改会检查版本，拒绝覆盖较新的记录并刷新提示重试。网络失败恢复已保存版本，未保存输入保留在该账号的本机恢复备份中。退出清除当前账号显示缓存，本机体验记录和服务器家庭记录保留。
+家庭更改通过具体操作保存，服务器计算库存、需求、预留、撤销和完成；前台约每4秒检查更新。多人同时修改会检查版本，拒绝覆盖较新记录并提示重试。发送前客户端保存操作回执，响应丢失时用原编号恢复确认，不会重复入库或扣减；未确认时暂不继续修改。退出清除账号显示缓存，本机体验和服务器记录保留。
 
-当前是本地服务器账号，尚未部署公网、接短信或邮箱验证、找回密码。两台手机需要访问同一个后端地址；运行服务器前设置环境变量`HOST=0.0.0.0`可在家庭局域网访问电脑IP与8767端口。`preview_mobile.py`提供的纯静态预览不支持账号API。公网部署使用HTTPS并设置`ACCOUNT_SECURE_COOKIE=1`；数据库路径可通过`ACCOUNT_DB`指定。备份账号与家庭时停止服务后复制SQLite数据库，菜谱导出仅包含菜谱。
+P1–P4 已接入现有页面，正在完成整体验收及 P5/P6。阶段记录见 [后端开发进度](docs/backend-progress.md)，请求格式和操作列表见 [家庭业务 API](docs/backend-api.md)。安卓调试包已构建并安装模拟器；实际公网部署与真机验收仍待完成。
+
+当前尚未部署公网、接短信或邮箱验证、找回密码。两台手机需要访问同一后端；局域网设置 `HOST=0.0.0.0`。纯静态预览不支持账号 API。公网使用 HTTPS 和 `ACCOUNT_SECURE_COOKIE=1`；备份使用 `database_tools.py` 并配套保存媒体卷，菜谱导出仅包含菜谱。
 
 ## 模型配置
 
@@ -82,7 +89,7 @@ DOUYIN_BROWSER_CHANNEL=chrome
 5. 后端核对精确用量是否在引用中出现，缺失用量保留为空；食材别名、单位和份数用于合并购物清单。
 6. 程序合并各组结果，返回浏览器生成菜谱卡；无需额外AI调用来合并。同菜片段由整理模型合成一张卡，后端拒绝重复拆出的同名卡，不再直接丢弃后面的同名片段以免漏步骤。每组独立缓存，失败组有明确警告，重试复用成功组。媒体及模型结果缓存留在data/，卡片选择和编辑留在原来的浏览器localStorage。timings.recipeRoute返回parallel或whole，便于核对实际路线。
 
-菜谱接口为GET /api/status、POST /api/parse、POST /api/shopping；原始材料通过/media/提供。账号接口包括GET /api/account/session以及POST /api/account/register、login、logout、profile；家庭加入与保存为POST /api/household/join、save。API可供未来移动客户端复用，当前交付为手机网页。
+菜谱接口为GET /api/status、POST /api/parse、POST /api/shopping；原始材料通过/media/提供。账号接口包括GET /api/account/session以及POST /api/account/register、login、logout、profile；家庭加入为POST /api/household/join，共享操作为POST /api/household/commands。旧save接口已停用，返回410。API可供未来移动客户端复用，当前交付为手机网页。
 
 ## 耗时优化
 

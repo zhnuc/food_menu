@@ -5,6 +5,7 @@ import math
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from ai import response_json
 from visual_pack import contact_sheet
 
@@ -71,7 +72,8 @@ def enrich_visuals(data,directory,vision_key='',vision_url='',vision_model='',re
                 return [(frame,None if index in duplicates else mapped.get(index)) for index,frame in enumerate(frames)]
             except Exception:return [(frame,None) for frame in frames]
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            results=[row for batch in pool.map(recognize_batch,batches) for row in batch]
+            futures=[pool.submit(copy_context().run,recognize_batch,batch) for batch in batches]
+            results=[row for future in futures for row in future.result()]
         for frame,text in results:
             if text is not None:data.setdefault('visionAssets',[]).append(frame['asset'])
             if text:

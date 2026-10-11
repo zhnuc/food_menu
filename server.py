@@ -66,6 +66,7 @@ class Handler(AccountRoutes, SimpleHTTPRequestHandler):
 
 
 if __name__=='__main__':
+    import uvicorn
     port=int(os.getenv('PORT','8767'))
     print(f'一起吃饭：http://127.0.0.1:{port}',flush=True)
-    ThreadingHTTPServer((os.getenv('HOST','127.0.0.1'),port),Handler).serve_forever()
+    uvicorn.run('application:app',host=os.getenv('HOST','127.0.0.1'),port=port,proxy_headers=True,forwarded_allow_ips=os.getenv('TRUSTED_PROXY_IPS','127.0.0.1'))

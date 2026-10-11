@@ -21,3 +21,8 @@ validation/*.log
 validation/*.json
 validation/*.jpg
 validation/*.png
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+deploy/production.env

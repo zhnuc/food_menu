@@ -1,0 +1,8 @@
+{
+  "appId": "com.yiqichifan.app",
+  "appName": "一起吃饭",
+  "webDir": ".data/native-web",
+  "loggingBehavior": "none",
+  "server": { "androidScheme": "https" },
+  "plugins": { "CapacitorHttp": { "enabled": true }, "CapacitorCookies": { "enabled": true } }
+}

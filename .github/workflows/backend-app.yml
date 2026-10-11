@@ -1,0 +1,81 @@
+name: Backend and native apps
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: backend-app-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: food_menu_check
+        ports: [5432:5432]
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12', cache: pip}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22', cache: npm}
+      - run: pip install -r requirements.txt
+      - run: npm ci
+      - run: npm test
+      - run: python -m unittest discover -s tests -q
+        env:
+          TEST_POSTGRES_URL: postgresql://postgres:test-only-password@127.0.0.1:5432/food_menu_check
+      - run: python scripts/build_offline.py
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22', cache: npm}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '21'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: npm ci
+      - run: python scripts/sync_native.py
+        env:
+          APP_API_URL: ${{ vars.APP_API_URL || 'http://10.0.2.2:8767' }}
+      - run: npx cap sync android
+      - run: bash gradlew assembleDebug --no-daemon
+        working-directory: android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: together-kitchen-android-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+  ios-simulator:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22', cache: npm}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: npm ci
+      - run: python scripts/sync_native.py
+        env:
+          APP_API_URL: ${{ vars.APP_API_URL || 'https://example.invalid' }}
+          APP_RELEASE: '1'
+      - run: npx cap sync ios
+      - run: xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath ios/DerivedData CODE_SIGNING_ALLOWED=NO build
+      - run: python scripts/ios_simulator.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: together-kitchen-ios-simulator
+          path: |
+            ios/DerivedData/Build/Products/Debug-iphonesimulator/App.app
+            output/ios
+          retention-days: 7

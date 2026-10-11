@@ -1,0 +1,77 @@
+name: together-kitchen
+services:
+  db:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kitchen
+      POSTGRES_USER: kitchen
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a private database password}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U kitchen -d kitchen']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  api:
+    build: ..
+    restart: unless-stopped
+    env_file: production.env
+    environment:
+      DATABASE_URL: postgresql://kitchen:${POSTGRES_PASSWORD}@db:5432/kitchen
+      HOST: 0.0.0.0
+      PORT: 8767
+      BLOB_ROOT: /app/.data/files
+      ACCOUNT_SECURE_COOKIE: '1'
+      DOUYIN_BROWSER_CHANNEL: ''
+      TRUSTED_PROXY_IPS: '*'
+    volumes:
+      - objects:/app/.data
+      - media:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "from urllib.request import urlopen; urlopen('http://127.0.0.1:8767/api/health',timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging:
+      options: {max-size: 10m, max-file: '3'}
+  worker:
+    build: ..
+    command: [python, worker.py]
+    restart: unless-stopped
+    env_file: production.env
+    environment:
+      DATABASE_URL: postgresql://kitchen:${POSTGRES_PASSWORD}@db:5432/kitchen
+      BLOB_ROOT: /app/.data/files
+      DOUYIN_BROWSER_CHANNEL: ''
+    volumes:
+      - objects:/app/.data
+      - media:/app/data
+    depends_on:
+      api:
+        condition: service_healthy
+    logging:
+      options: {max-size: 10m, max-file: '3'}
+  https:
+    image: caddy:2
+    restart: unless-stopped
+    ports: [80:80, 443:443]
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set the real DNS hostname}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - certificates:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+volumes:
+  postgres:
+  objects:
+  media:
+  certificates:
+  caddy_config:

@@ -1,0 +1,12 @@
+{$APP_DOMAIN} {
+    encode gzip
+    request_body {
+        max_size 13MB
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        Referrer-Policy "same-origin"
+        X-Frame-Options "DENY"
+    }
+    reverse_proxy api:8767
+}

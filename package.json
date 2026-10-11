@@ -5,6 +5,13 @@
     "test": "node --test tests/*.cjs"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.9",
+    "fake-indexeddb": "^6.2.5",
     "jsdom": "26.1.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.6.9",
+    "@capacitor/core": "^7.6.9",
+    "@capacitor/ios": "^7.6.9"
   }
 }

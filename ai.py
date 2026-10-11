@@ -2,12 +2,14 @@
 import json
 import os
 import time
+from contextvars import ContextVar
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).parent
+usage_observer=ContextVar('ai_usage_observer',default=None)
 for line in (ROOT / '.env').read_text(encoding='utf-8-sig').splitlines() if (ROOT / '.env').exists() else []:
     if '=' in line and not line.strip().startswith('#'):
         name, value = line.split('=', 1)
@@ -23,7 +25,7 @@ def settings(stage=''):
             model)
 
 
-def request_json(url, body=None, token='', timeout=45):
+def _request_json(url, body=None, token='', timeout=45):
     request = Request(url, data=json.dumps(body).encode() if body is not None else None,
         headers={'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0',
                  **({'Authorization': 'Bearer ' + token} if token else {})})
@@ -44,6 +46,21 @@ def request_json(url, body=None, token='', timeout=45):
     if len(raw) > 2_000_000:
         raise ValueError('模型返回内容过大')
     return json.loads(raw)
+
+
+def request_json(url, body=None, token='', timeout=45):
+    start=time.perf_counter();result=None
+    try:
+        result=_request_json(url,body,token,timeout)
+        return result
+    finally:
+        observer=usage_observer.get()
+        if observer:
+            usage=result.get('usage',{}) if isinstance(result,dict) else {}
+            valid=lambda value:value if isinstance(value,int) and not isinstance(value,bool) and value>=0 else None
+            observer({'model':str((body or {}).get('model',''))[:200],'succeeded':result is not None,
+                'inputTokens':valid(usage.get('prompt_tokens')),'outputTokens':valid(usage.get('completion_tokens')),
+                'elapsed':round(time.perf_counter()-start,3)})
 
 
 def response_json(result):

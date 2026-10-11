@@ -2,6 +2,7 @@
 import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextvars import copy_context
 
 
 def groups(evidence, batch_size=3):
@@ -57,7 +58,7 @@ def run(source,evidence,prompt,endpoint,key,model,cache,refresh,request_json,dec
             return [],hit,'、'.join(names or ['未分段配图'])+'：'+(str(exc) if isinstance(exc,ValueError) else '整理请求失败，重试可补齐。')
     results=[None]*len(batches)
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        pending={pool.submit(process,batch):index for index,batch in enumerate(batches)}
+        pending={pool.submit(copy_context().run,process,batch):index for index,batch in enumerate(batches)}
         completed=0
         for future in as_completed(pending):
             index=pending[future]

@@ -49,11 +49,12 @@ class AccountTests(unittest.TestCase):
         joined = self.store.join(bob, {'code': alice['household']['invite'].lower()})
         self.assertEqual(len(joined['members']), 2)
         self.assertNotEqual(joined['user']['id'], alice['user']['id'])
-        update = snapshot();update['state']['stocks'] = [{'id':'egg','name':'鸡蛋','unit':'个','quantity':3,'space':None,'zone':0}]
-        self.store.save(self.token, {'revision':1, 'snapshot':update})
+        self.store.command(self.token, {'id':'add-eggs-1','revision':1,'role':'chef','kind':'stock.add',
+                           'payload':{'name':'鸡蛋','quantity':3,'unit':'个','space':None,'zone':0}})
         self.assertEqual(self.store.current(bob)['snapshot']['state']['stocks'][0]['quantity'], 3)
         with self.assertRaises(AccountError) as error:
-            self.store.save(bob, {'revision':1, 'snapshot':snapshot()})
+            self.store.command(bob, {'id':'add-eggs-2','revision':1,'role':'chef','kind':'stock.add',
+                               'payload':{'name':'鸡蛋','quantity':1,'unit':'个','space':None,'zone':0}})
         self.assertEqual(error.exception.status, 409)
         self.assertEqual(self.store.current(self.token)['revision'], 2)
 
@@ -63,11 +64,9 @@ class AccountTests(unittest.TestCase):
         for avatar in ('https://example.com/a.png', 'data:image/svg+xml;base64,AAAA', 'data:image/png;base64,AAAA'):
             with self.assertRaises(AccountError): self.store.profile(self.token, {'nickname':'阿满','avatar':avatar})
         update = snapshot();update['state']['meal']['status']='locked'
-        self.store.save(self.token, {'revision':1,'snapshot':update})
-        update['state']['meal']['selections'].append({'recipeId':'new','servings':1})
-        with self.assertRaises(AccountError) as error: self.store.save(self.token, {'revision':2,'snapshot':update})
-        self.assertEqual(error.exception.status, 409)
-        self.assertEqual(self.store.current(self.token)['snapshot']['state']['meal']['selections'], [])
+        with self.assertRaises(AccountError) as error: self.store.save(self.token, {'revision':1,'snapshot':update})
+        self.assertEqual(error.exception.status, 410)
+        self.assertEqual(self.store.current(self.token)['snapshot']['state']['meal']['status'], 'draft')
 
     def test_bad_registration_and_snapshot_do_not_create_records(self):
         for payload in ({**self.payload,'login':'a'}, {**self.payload,'password':'tiny'}, {**self.payload,'nickname':' '}):
@@ -96,6 +95,14 @@ class AccountTests(unittest.TestCase):
             response=post('/api/account/login',self.payload)
             self.assertIn('HttpOnly',response.headers['Set-Cookie']);self.assertIn('SameSite=Strict',response.headers['Set-Cookie'])
             self.assertEqual(json.load(response)['user']['login'],'alice')
+            command={'id':'http-add-eggs','revision':1,'role':'chef','kind':'stock.add',
+                     'payload':{'name':'鸡蛋','quantity':3,'unit':'个','space':None,'zone':0}}
+            updated=json.load(post('/api/household/commands',command))
+            self.assertEqual(updated['snapshot']['state']['stocks'][0]['quantity'],3)
+            replay=json.load(post('/api/household/commands',command))
+            self.assertTrue(replay['duplicate']);self.assertEqual(replay['revision'],updated['revision'])
+            with self.assertRaises(HTTPError) as error:post('/api/household/save',{'revision':2,'snapshot':snapshot()})
+            self.assertEqual(error.exception.code,410)
             with self.assertRaises(HTTPError) as error: post('/api/account/profile',{'nickname':'changed'},'https://evil.invalid')
             self.assertEqual(error.exception.code,403)
             post('/api/account/logout',{}).close()

@@ -50,7 +50,7 @@ def _browser_info(url,module):
     with sync_playwright() as runtime:
         # A fresh context is intentionally independent of logged-in Chrome.
         # Login/verification challenges are reported, never automatically solved.
-        browser=runtime.chromium.launch(channel=os.getenv('DOUYIN_BROWSER_CHANNEL','chrome'),
+        browser=runtime.chromium.launch(channel=os.getenv('DOUYIN_BROWSER_CHANNEL','chrome') or None,
                                        headless=True,args=['--no-proxy-server'])
         try:
             context=browser.new_context(user_agent=_UA,viewport={'width':390,'height':844},is_mobile=True,has_touch=True)

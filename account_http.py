@@ -84,6 +84,8 @@ class AccountRoutes:
                 self.account_respond(store.join(token, payload))
             elif path == '/api/household/save':
                 self.account_respond(store.save(token, payload))
+            elif path == '/api/household/commands':
+                self.account_respond(store.command(token, payload))
             else:
                 raise AccountError('接口不存在', 404)
         except AccountError as exc:
