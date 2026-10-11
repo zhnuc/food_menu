@@ -4,7 +4,7 @@
 
 ## 已验证
 
-- Python 118 项通过，包含真实 PostgreSQL、并发事务、幂等回执、任务租约和跨数据库备份恢复。完整结果留在本机 validation/backend-postgres-tests.log，CI 同样执行真实 PostgreSQL 套件。
+- Python 118 项通过，包含真实 PostgreSQL、并发事务、幂等回执、任务租约和跨数据库备份恢复。完整结果见最终 CI 后端任务日志；本机 validation/backend-postgres-tests.log 保留早期 PostgreSQL 子集检查点。
 - JavaScript 最终 69 项全部通过；涵盖家庭规则、界面交互、账号隔离、IndexedDB 草稿与照片，以及原生断网退出恢复。结果 validation/javascript-final.txt。
 - 真实模型：文字生成一道菜；图片中的菜谱原文识别后整理，鸡蛋 2 个、番茄 200 克、盐 1 克、油 10 毫升保留。三次调用 token 与耗时落库，本机详情 validation/backend-real-ai.json。
 - Android 15 模拟器实际安装 APK：注册、邀请入同家庭、Cookie 登录跨重启保持；App 点菜、网页锁定、App 使用 300 克并完成，另一端看到 500 → 200 克库存及一条做饭记录。实际图片上传创建持久任务成功。
@@ -12,6 +12,7 @@
 - 新增恢复路径：断网时从设置进入服务器连接，先展示本地留档/照片/草稿删除说明，用户确认后设备 Cookie 和当前账号 IndexedDB 留档均清空，重新设置连接地址成功。旧服务端会话未撤销的限制在界面说明。网络阻断规则已撤销。
 - 最终安装包默认模拟器服务 http://10.0.2.2:8767。真机需在「我的 → 设置 → 服务器连接」输入实际可访问的服务器根地址。未把模型密钥、账号口令或服务器文件打包。
 - CI [38162189586](https://github.com/zhnuc/food_menu/actions/runs/38162189586) 后端、Android、macOS iOS 三项成功；后端任务额外完成 Docker 镜像构建、Compose 配置验证和容器健康接口启动。
+- 最终提交 f6d808e 的 CI [38171891049](https://github.com/zhnuc/food_menu/actions/runs/38171891049) 三项全部成功。后端日志确认 69 项 JavaScript、118 项 Python 全部通过；安卓 APK 和 iOS 模拟器 .app 均重新构建成功。
 - 远程 iPhone 16 Pro 模拟器安装启动 .app 成功。检查新版截图确认状态栏安全区域修复有效，Logo、标题和导航正常显示；截图保存在 output/ios-simulator-latest/output/ios/launched.png。
 
 ## 产物与边界

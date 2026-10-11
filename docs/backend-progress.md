@@ -82,3 +82,4 @@
 - Android 原生真实断网重开通过，已同步账号、6 道菜、1 餐和头像仍能查看，恢复网络后重连。补充不可达旧服务器的明确退出本机入口，设备 Cookie 与当前账号留档清除后可切换地址；JavaScript 最终 69 项通过。
 - 最终调试 APK 已构建并导出到 output/together-kitchen-android-debug.apk，默认模拟器地址 http://10.0.2.2:8767。真实手机在设置中填写可访问的服务地址；尚未配置实际阿里云目标，也没有商店发布签名。
 - 验收明细和产物边界见 [backend-app-acceptance-20261012.md](../validation/backend-app-acceptance-20261012.md)。本轮可部署后端与 App 验证目标收尾；实际公网部署、真机联调及商业发布另有待配置事项，不记为已完成。
+- 最终代码 f6d808e 已推送，CI https://github.com/zhnuc/food_menu/actions/runs/38171891049 三项全部成功：69 项 JavaScript、118 项 Python、Docker 启动、安卓构建及远程 iOS 模拟器安装启动。本轮续跑目标已达成，停用 app 自动续跑；等待实际部署信息后再开展公网及真机验收。
