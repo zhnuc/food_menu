@@ -396,7 +396,8 @@
       switch(d.action) {
         case 'close':close();break;
         case 'jobs':await showJobs();break;
-        case 'server-settings':if(A.user)throw Error('请先退出账号，再切换服务器');sheet('连接你的服务器',form(field('服务器地址','url',NativeBridge.root(),'url','required placeholder="https://你的域名"')+'<p class="hint">输入部署这套服务的地址，然后重新登录。</p>','server-settings'));break;
+        case 'server-settings':if(A.user){if(!A.offline)throw Error('请先退出账号，再切换服务器');sheet('退出本机登录',`<p class="sheet-note">旧服务器暂时无法连接。退出本机会清除这个账号的本地留档、照片和草稿，云端数据保留；旧服务器上的会话要联网后才能撤销。</p>${button('退出本机，重新连接','account-disconnect','','delete-space-button')}`);break;}sheet('连接你的服务器',form(field('服务器地址','url',NativeBridge.root(),'url','required placeholder="https://你的域名"')+'<p class="hint">输入部署这套服务的地址，然后重新登录。</p>','server-settings'));break;
+        case 'account-disconnect':await A.disconnectLocal();sheet('连接你的服务器',form(field('服务器地址','url',NativeBridge.root(),'url','required placeholder="https://你的域名"')+'<p class="hint">输入部署这套服务的地址，然后重新登录。</p>','server-settings'));break;
         case 'job-detail':await showJob(d.id);break;
         case 'job-save':await saveJob(d.id);break;
         case 'job-retry':await JobsClient.action(d.id,'retry');await showJob(d.id);break;

@@ -18,6 +18,8 @@ output/
 .archive/
 services/AIClient2API/
 validation/*.log
+validation/*-build.txt
+validation/javascript-final.txt
 validation/*.json
 validation/*.jpg
 validation/*.png

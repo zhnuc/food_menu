@@ -1,17 +1,32 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 const C=require('../web/kitchen-core.js');
 const initial=()=>({user:{id:'one',nickname:'禾',avatar:''},household:{id:'home',name:'家',invite:'CODE'},members:[],revision:1,snapshot:{state:{version:1},recipeData:{recipes:[]}}});
-async function clientFor(responder,storage=new Map(),cache) {
+async function clientFor(responder,storage=new Map(),cache,native={}) {
   const applied=[],notifications=[];
   const sandbox={KitchenCore:C,window:{LocalCache:cache},document:{hidden:false,addEventListener(){},getElementById(){return {open:false};}},setInterval(){},localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)},fetch:async(path,options)=>{
     const result=await responder(path,options);return {ok:!result.status || result.status<400,status:result.status || 200,json:async()=>result.data};
   }};
   vm.runInNewContext(fs.readFileSync(require.resolve('../web/accounts-client.js'),'utf8'),sandbox);
+  Object.assign(sandbox.window,native);
   const client=sandbox.window.AccountClient;
   await client.start({apply:data=>applied.push(C.clone(data)),render(){},guest(){},notify:message=>notifications.push(message)});
   return {client,applied,notifications,storage};
 }
 const context={role:'chef',mealId:'meal-one'};
+
+test('native offline disconnect clears cookies and account archives without contacting the old server',async()=>{
+  const operations=[],storage=new Map([['together-account-cache-one','private']]);
+  const cache={restoreAccount:async()=>initial(),forgetAccount:async id=>operations.push('forget:'+id)};
+  const {client}=await clientFor(()=>{throw Error('unreachable');},storage,cache,{NativeBridge:{native:()=>true},Capacitor:{Plugins:{CapacitorCookies:{clearAllCookies:async()=>operations.push('cookies')}}}});
+  await client.disconnectLocal();
+  assert.deepEqual(operations,['cookies','forget:one']);assert.equal(client.user,null);assert.equal(client.household,null);assert.equal(storage.has('together-account-cache-one'),false);
+});
+
+test('failed native cookie clearing preserves offline identity and archives',async()=>{
+  let forgotten=false;
+  const {client}=await clientFor(()=>{throw Error('offline');},new Map(),{restoreAccount:async()=>initial(),forgetAccount:async()=>{forgotten=true;}},{NativeBridge:{native:()=>true},Capacitor:{Plugins:{CapacitorCookies:{clearAllCookies:async()=>{throw Error('cookie failure');}}}}});
+  await assert.rejects(client.disconnectLocal(),/cookie failure/);assert.equal(client.user.id,'one');assert.equal(forgotten,false);
+});
 
 test('offline startup restores a read-only copy and reconnect verifies the server session',async()=>{
   let disconnected=true,writes=0;

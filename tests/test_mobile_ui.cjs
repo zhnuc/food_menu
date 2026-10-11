@@ -27,6 +27,17 @@ test('home renders four main destinations with illustrated icons and a clean kit
   const ui=setup();assert.equal(ui.w.document.querySelectorAll('#navigation button').length,4);assert.equal(ui.w.document.querySelector('[data-konsta="app"]').dataset.uiTheme,'material-green');assert.ok(ui.w.document.querySelector('[data-konsta="tabbar"]'));assert.ok(ui.w.document.querySelector('[data-konsta="segmented"]'));assert.equal(ui.w.document.querySelectorAll('#navigation img').length,4);assert.match(ui.w.document.querySelector('.brand-mark img').src,/navigation\/v1\/128\/logo.png/);assert.match(ui.w.document.body.textContent,/冷藏上层/);assert.match(ui.w.document.body.textContent,/可用 500克/);ui.dom.window.close();
 });
 
+test('offline native connection recovery explains local deletion and opens server configuration after confirmation',async()=>{
+  const shared=C.seed(),ui=setup(null,null,{user:{id:'offline',nickname:'离线',avatar:''},household:{id:'home',name:'家',invite:'CODE'},members:[],revision:1,snapshot:{state:shared,recipeData:{version:2,recipes:shared.recipes,evidence:{}}}});let disconnected=false;
+  await new Promise(resolve=>setImmediate(resolve));
+  ui.w.NativeBridge={native:()=>true,root:()=> 'https://old.example'};
+  Object.assign(ui.w.AccountClient,{user:{id:'offline',nickname:'离线'},offline:true,disconnectLocal:async()=>{disconnected=true;ui.w.AccountClient.user=null;}});
+  ui.click('nav','page','mine');ui.click('settings');ui.click('server-settings');
+  assert.match(ui.w.document.querySelector('#sheet-body').textContent,/草稿，云端数据保留/);assert.equal(disconnected,false);
+  ui.click('account-disconnect');await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(disconnected,true);assert.equal(ui.w.document.querySelector('#sheet-title').textContent,'连接你的服务器');assert.equal(ui.w.document.querySelector('[name="url"]').value,'https://old.example');ui.dom.window.close();
+});
+
 test('meal diary gives a short inventory note rather than listing raw ingredients',()=>{
   const initial=C.seed();initial.records=[{id:'record',at:new Date().toISOString(),dishes:[{name:'番茄炒蛋'}],unrecorded:['猪肉','鸡蛋','葱姜蒜','生抽']}];initial.page='mine';
   const ui=setup(initial),before=JSON.stringify(ui.saved());ui.click('record');const body=ui.w.document.querySelector('#sheet-body').textContent;

@@ -36,6 +36,17 @@
     const id=client.user?.id;if(id){localStorage.removeItem('together-account-cache-'+id);await window.LocalCache?.forgetAccount(id);}
     confirmed=null;client.pending=false;adopt({user:null},false);hooks.guest();hooks.render();
   };
+  client.disconnectLocal=async()=>{
+    if(!window.NativeBridge?.native() || !client.offline)throw Error('请联网退出账号');
+    if(client.syncing)throw Error('正在保存厨房，请稍后再退出');
+    // Explicit recovery when the old server cannot be reached. Its session is
+    // not revoked; clear device cookies before allowing another connection.
+    const cookies=window.Capacitor?.Plugins?.CapacitorCookies;
+    if(!cookies?.clearAllCookies)throw Error('无法清除本机登录，请重启 App 后重试');
+    await cookies.clearAllCookies();
+    const id=client.user?.id;if(id){localStorage.removeItem('together-account-cache-'+id);await window.LocalCache?.forgetAccount(id);}
+    confirmed=null;client.pending=false;adopt({user:null},false);hooks.guest();hooks.render();
+  };
   client.refresh=async()=>{
     if(!client.user || client.syncing || document.hidden || refreshing)return;
     const identity=client.user.id,household=client.household.id,revision=client.revision;refreshing=true;
