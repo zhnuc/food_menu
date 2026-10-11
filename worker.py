@@ -34,7 +34,11 @@ def stable_recipes(job, data):
 
 def execute(job,jobs):
     body=job['payload'];kind=job['kind'];emit=lambda name,data:jobs.emit(job,name,stable_recipes(job,data))
-    if kind=='link':return stable_recipes(job,parse(body,on_event=emit))
+    if kind=='link':
+        result=stable_recipes(job,parse(body,on_event=emit))
+        if not result.get('evidence'):
+            raise ValueError('；'.join(result.get('warnings') or ['未取得可整理的来源内容，请补充正文或图片后重试']))
+        return result
     key,url,model=ai.settings('vision' if kind=='image' else 'recipe')
     if not key:raise ValueError('尚未配置模型服务，请联系管理员')
     emit('progress',{'stage':'recipes','message':'正在识别菜谱图片…' if kind=='image' else '正在生成菜谱，请在完成后核对…'})

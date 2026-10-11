@@ -8,6 +8,11 @@ from vision import enrich_visuals
 ROOT=Path(__file__).parent
 DATA=ROOT/'data'
 DOMAINS=('xiaohongshu.com','xhslink.cn','xhslink.com')
+SHARE_UA='Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36'
+
+def video_format(height):
+    size_filter='[filesize<=?100000000]'
+    return f'bv[height<={height}]{size_filter}/b[height<={height}]{size_filter}/best{size_filter}'
 def allowed(url):
     p=urlparse(url);host=p.hostname or ''
     return p.scheme in ('http','https') and not p.username and not p.password and p.port in (None,80,443) and any(host==d or host.endswith('.'+d) for d in DOMAINS)
@@ -22,7 +27,7 @@ class ImageRedirect(HTTPRedirectHandler):
         return super().redirect_request(req,fp,code,msg,headers,newurl)
 def resolve(url):
     if not allowed(url):raise ValueError('小红书链接无效')
-    with build_opener(Redirect).open(Request(url,headers={'User-Agent':'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36'}),timeout=25) as response:
+    with build_opener(Redirect).open(Request(url,headers={'User-Agent':SHARE_UA}),timeout=25) as response:
         final=response.url
     target=parse_qs(urlparse(final).query).get('redirectPath',[''])[0] if urlparse(final).path=='/login' else final
     target=target.replace('http://','https://',1)
@@ -34,7 +39,7 @@ def _download_image(url, path):
     host=urlparse(url).hostname or ''
     if not (host=='xhscdn.com' or host.endswith('.xhscdn.com')):
         raise ValueError('图文笔记包含非小红书图片地址，已停止下载')
-    req=Request(url,headers={'User-Agent':'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36','Referer':'https://www.xiaohongshu.com/'})
+    req=Request(url,headers={'User-Agent':SHARE_UA,'Referer':'https://www.xiaohongshu.com/'})
     with build_opener(ImageRedirect()).open(req,timeout=25) as response:
         content_type=response.headers.get_content_type()
         if content_type not in ('image/jpeg','image/png','image/webp'):
@@ -48,6 +53,7 @@ def _download_image(url, path):
 
 def extract(url,vision_key='',vision_url='',vision_model='',request_json=None):
     import yt_dlp
+    from xhs_adapter import PublicShareXHSIE
     from video_media import _frames
     acquire_start=time.perf_counter()
     target,note=resolve(url);directory=DATA/note;directory.mkdir(parents=True,exist_ok=True)
@@ -56,8 +62,9 @@ def extract(url,vision_key='',vision_url='',vision_model='',request_json=None):
     if cached.exists():data=json.loads(cached.read_text(encoding='utf-8'))
     else:
         height=max(240,min(720,int(os.getenv('MEDIA_VIDEO_HEIGHT','480'))))
-        opts={'quiet':True,'noprogress':True,'socket_timeout':25,'retries':0,'noplaylist':True,'max_filesize':100_000_000,'outtmpl':str(directory/'video.%(ext)s'),'format':f'bv[height<={height}]/b[height<={height}]/best','ignore_no_formats_error':True}
+        opts={'quiet':True,'noprogress':True,'http_headers':{'User-Agent':SHARE_UA},'socket_timeout':25,'retries':0,'noplaylist':True,'max_filesize':100_000_000,'outtmpl':str(directory/'video.%(ext)s'),'format':video_format(height),'ignore_no_formats_error':True}
         with yt_dlp.YoutubeDL(opts) as engine:
+            engine.add_info_extractor(PublicShareXHSIE())
             info=engine.extract_info(target,download=False)
             if info.get('extractor_key')!='XiaoHongShu':raise ValueError('平台未返回可用的小红书内容')
             if not info.get('formats'):

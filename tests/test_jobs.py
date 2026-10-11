@@ -87,3 +87,13 @@ class JobTests(unittest.TestCase):
                 recipe_batches.run({},[], 'p','http://model','key','test',Path(self.tmp.name),False,ai.request_json,ai.response_json,lambda *_:[],on_batch=None)
             self.assertEqual(len(entries),1);self.assertEqual(entries[0]['inputTokens'],8)
         finally:ai.usage_observer.reset(context)
+
+    def test_unavailable_link_material_is_failed_and_retryable(self):
+        from worker import execute
+        item=self.create(kind='link',input={'share':'https://xhslink.cn/o/unavailable'})
+        with patch('worker.parse',return_value={'recipes':[],'evidence':[],'warnings':['平台材料暂不可用']}), patch('worker.log.exception'):
+            run_once(self.jobs,execute)
+        result=self.jobs.get(self.token,item['id'])
+        self.assertEqual(result['status'],'failed')
+        self.assertEqual(result['error'],'平台材料暂不可用')
+        self.assertEqual(self.jobs.action(self.token,item['id'],'retry')['status'],'queued')
