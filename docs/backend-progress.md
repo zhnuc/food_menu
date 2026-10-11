@@ -99,4 +99,5 @@
 - 安卓更新为默认云端 HTTPS；原生登录成功。联调发现空间位置函数遮蔽浏览器 location，导致切换服务器后重载报错；已改用 window.location.reload，69 项 JavaScript 通过，重新构建安装。
 - 完成包含数据库/私有图片、平台媒体和网关授权配置的首次私有备份；恢复到独立 SQLite 校验账号、家庭、图片、餐次、任务与用量。每日备份 timer 配置在台北时间 03:00，备份保留在服务器私有目录；尚无异机自动备份与容量告警。
 - GitHub APP_API_URL 变量已设置实际 HTTPS 地址，后续 Android/iOS CI 构建使用云端。iOS 仍为无签名模拟器包，不能当作真机 IPA。
-- 公网联调证据在忽略的 output/cloud-acceptance-20261012.json 与 output/playwright/cloud-*；临时测试账号将在收尾清理，服务上线从空家庭库开始。
+- 公网联调证据在忽略的 output/cloud-acceptance-20261012.json 与 output/playwright/cloud-*；已按精确账号及家庭 ID 清理三个临时测试账号和两张测试图片，保留非测试账号及数据。
+- 最终安卓包实测云端登录、关闭重开、断网留档、网络恢复和原生头像上传成功；切换地址后的重载也已验证。Git 2f8890e 的 CI [38178098446](https://github.com/zhnuc/food_menu/actions/runs/38178098446) 三项全部通过：118 项 Python、69 项 JavaScript、Docker 启动、安卓构建和远程 iOS 模拟器构建启动。已下载默认实际云端地址的 iOS 模拟器产物；仍未验收 iPhone 真机家庭联调。
