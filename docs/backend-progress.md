@@ -101,3 +101,12 @@
 - GitHub APP_API_URL 变量已设置实际 HTTPS 地址，后续 Android/iOS CI 构建使用云端。iOS 仍为无签名模拟器包，不能当作真机 IPA。
 - 公网联调证据在忽略的 output/cloud-acceptance-20261012.json 与 output/playwright/cloud-*；已按精确账号及家庭 ID 清理三个临时测试账号和两张测试图片，保留非测试账号及数据。
 - 最终安卓包实测云端登录、关闭重开、断网留档、网络恢复和原生头像上传成功；切换地址后的重载也已验证。Git 2f8890e 的 CI [38178098446](https://github.com/zhnuc/food_menu/actions/runs/38178098446) 三项全部通过：118 项 Python、69 项 JavaScript、Docker 启动、安卓构建和远程 iOS 模拟器构建启动。已下载默认实际云端地址的 iOS 模拟器产物；仍未验收 iPhone 真机家庭联调。
+
+## 小红书实际分享链接修复 · 2026-10-12
+
+- 用户反馈 xhslink.cn/o/ABspPz2S93g 返回没有足够依据。云端记录显示正文、图片和菜谱都为空；HTTP 服务、worker 和端口正常，问题发生在平台提取阶段。
+- 新版公开移动分享页使用 noteData.data.noteData，原 yt-dlp 仅读取 note.noteDetailMap；同时移动分享需要统一移动 User-Agent。新增项目内适配器兼容两种结构，严格核对笔记 ID，不把推荐内容作为菜谱依据，配图兼容 infoList。
+- 原始视频超过 100MB，但有较小的合法视频流。下载选择在原有 100MB 限制内挑选，不因为原视频过大忽略小流，未提高处理上限。云端实际取得 119.867 秒视频和 30 张关键帧。
+- 来源完全不可取得时，任务改为明确失败并可正常重试，避免空结果被记成处理成功。新增移动/旧页面、笔记 ID 隔离、视频时长、大小选择及任务重试回归检查。125 项 Python（含真实 PostgreSQL）全部通过；5880d12 已推送并部署。
+- 已重跑用户最近一次该链接的空结果任务，保持原任务 ID，不重复创建，也没有重置执行次数或使用额度。真实云端 OCR 与整理成功：一道椒麻虾片、31 条来源依据、3 次模型调用，无警告。结果保留供用户在菜谱生成任务中核对、收藏，没有自动覆盖收藏。
+- CI [38179483229](https://github.com/zhnuc/food_menu/actions/runs/38179483229) 后端、Android 与 iOS 三项成功；服务端、PostgreSQL 和 worker 健康。修复在服务端生效，现有 App 不需更换安装包。验收摘要在忽略的 output/xhs-fix-20261012.json，测试日志 validation/xhs-backend-tests.log。
