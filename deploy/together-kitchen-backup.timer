@@ -1,0 +1,10 @@
+[Unit]
+Description=Together Kitchen daily backup (03:00 Asia/Taipei)
+
+[Timer]
+OnCalendar=*-*-* 19:00:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

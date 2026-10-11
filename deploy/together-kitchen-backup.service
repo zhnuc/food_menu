@@ -1,0 +1,8 @@
+[Unit]
+Description=Together Kitchen private data backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/together-kitchen/deploy/backup.sh

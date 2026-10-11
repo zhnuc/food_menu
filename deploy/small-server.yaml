@@ -1,0 +1,40 @@
+# Optional overlay for a 2-core server with limited RAM.
+# Build one shared API/worker image; reduce concurrent model calls in production.env.
+services:
+  db:
+    command: [postgres, -c, max_connections=30, -c, shared_buffers=32MB, -c, work_mem=2MB]
+    mem_limit: 192m
+    logging:
+      options: {max-size: 10m, max-file: '3'}
+  api:
+    image: together-kitchen:server
+    build:
+      context: ..
+      network: host
+      args:
+        HTTP_PROXY: ${BUILD_PROXY:-}
+        HTTPS_PROXY: ${BUILD_PROXY:-}
+    # Password hashing alone needs about 128 MiB; leave room for two requests.
+    mem_limit: 384m
+    ports: ['127.0.0.1:8767:8767']
+  worker:
+    image: together-kitchen:server
+    mem_limit: 640m
+    build:
+      context: ..
+      network: host
+      args:
+        HTTP_PROXY: ${BUILD_PROXY:-}
+        HTTPS_PROXY: ${BUILD_PROXY:-}
+  https:
+    network_mode: host
+    networks: !reset []
+    ports: !reset []
+    environment:
+      APP_HTTPS_PORT: ${APP_HTTPS_PORT:-443}
+      HTTP_PROXY: ${BUILD_PROXY:-}
+      HTTPS_PROXY: ${BUILD_PROXY:-}
+      NO_PROXY: localhost,127.0.0.1,::1
+    volumes:
+      - ${CADDY_CONFIG:-./Caddyfile.small}:/etc/caddy/Caddyfile:ro
+    mem_limit: 96m

@@ -1,6 +1,6 @@
 # 服务端部署与恢复
 
-API、任务 worker、PostgreSQL、HTTPS 入口分别运行，图片和平台媒体使用持久卷。现在交付部署配置，实际阿里云目标和域名仍待确认，尚未上线。
+API、任务 worker、PostgreSQL、HTTPS 入口分别运行，图片和平台媒体使用持久卷。现有阿里云服务器已部署并通过公网注册、家庭协作、私有图片及真实 AI 任务验收。当前测试地址为 https://47.98.127.204:58900 ，详情见后端进度文档。
 
 ## 阿里云测试环境
 
@@ -52,3 +52,20 @@ python database_tools.py import-sqlite /private-backups/accounts.sqlite3
 ## 尚待上线验证
 
 实际服务器资源与 DNS/HTTPS；真实 Android 手机及 iPhone；真实平台链接的限流/验证码和模型商业授权；账号找回、邀请失效及家庭管理完整规则；持久卷容量告警、定时备份和保留期限。商业公开前还需要隐私条款和运营规则。
+
+## 当前小规格服务器与 IP HTTPS
+
+低内存服务器追加 deploy/small-server.yaml，API 与 worker 共用 together-kitchen:server 镜像。API 384 MiB 容纳 scrypt 密码散列，worker 640 MiB，数据库 192 MiB。production.env 中 DB_POOL_SIZE=3、VISION_WORKERS=1、RECIPE_WORKERS=1；容器上限总和不是预留内存，当前机器仅供两人测试，并非商业并发容量承诺。
+
+没有域名时，设置 APP_DOMAIN 为公网 IP、CADDY_CONFIG=./Caddyfile.ip、APP_HTTPS_PORT 为安全组已开放的端口（默认 443）。IP 配置使用显式 ACME shortlived issuer 与 default_sni，证书自动续期；需要公网 80 完成 HTTP 验证，保留 certificates 持久卷。当前安全组 443 不通，58900 可用；不要关闭 TLS 检查。IP 证书能力见 [Let’s Encrypt 官方说明](https://letsencrypt.org/2026/01/15/6day-and-ip-general-availability)，无 SNI 回退见 [Caddy 配置说明](https://caddyserver.com/docs/caddyfile/options#default-sni)。
+
+服务器已有本机代理时，可私下设置 BUILD_PROXY 用于 Docker 构建和 Caddy 外部 ACME 请求。需要配置 Docker daemon 代理以拉取基础镜像，不能把服务器代理的本机地址用于普通 bridge 容器。小规格 overlay 的 HTTPS 使用 host 网络，只将 API 映射到 127.0.0.1:8767。
+
+可选 deploy/gateway.yaml / gateway.Dockerfile 用于这轮两人测试。运行源代码位于私有 gateway-code 目录，先同步 package-lock（npm install --package-lock-only --ignore-scripts --omit=dev）再构建镜像。OAuth 和新生成的网关密钥仅在 /opt/together-kitchen-private/gateway-configs，归容器用户 10002；关闭网关管理 UI、无端口映射。MODEL_BASE_URL=http://gateway:3000/v1；如果借用主机代理，只允许实际项目 bridge 网段访问代理端口。公开产品改用正式模型供应商，不将个人授权打包进 App。
+
+```sh
+docker compose --env-file deploy/production.env -f deploy/compose.yaml -f deploy/small-server.yaml -f deploy/gateway.yaml up -d --no-build
+# 使用正式模型 API 时去掉 gateway.yaml。
+```
+
+deploy/backup.sh 会短暂停止 API/worker，配套备份数据库与图片、平台媒体，然后恢复服务。它不删除数据库卷、不自动覆盖备份；敏感备份保存在 /opt/together-kitchen-private/backups。首次恢复演练通过后安装 deploy/together-kitchen-backup.service 与 .timer 到 /etc/systemd/system，启用 timer；每日台北时间 03:00 执行。备份仍在同一服务器，后续需异机加密副本、容量告警及保留策略；旧备份仅由管理员检查后移走或删除。

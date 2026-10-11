@@ -1,5 +1,5 @@
 /* Static shell only. API, accounts and household photos never enter this cache. */
-const CACHE='together-shell-429553f3894944e4';
+const CACHE='together-shell-0d4336112a7ca6ac';
 self.addEventListener('install',event=>event.waitUntil((async()=>{
   const manifest=await (await fetch('/offline-assets.json',{cache:'no-store'})).json();
   const cache=await caches.open(CACHE);

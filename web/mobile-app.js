@@ -484,7 +484,7 @@
     if(!A.ready || A.syncing){element.querySelector('.form-error').textContent='正在同步，请稍后再保存';return;}
     try {
       let pending;
-      if(type==='server-settings'){if(A.user)throw Error('请先退出账号');NativeBridge.setRoot(values.url);location.reload();return;}
+      if(type==='server-settings'){if(A.user)throw Error('请先退出账号');NativeBridge.setRoot(values.url);window.location.reload();return;}
       if(type==='generate') {
         const submit=element.querySelector('.button-primary');submit.disabled=true;
         try{const input={prompt:values.prompt || ''};if(element.dataset.kind==='image')input.image=await JobsClient.upload(values.image);if(element.dataset.kind==='ingredients')input.ingredients=values.ingredients;const job=await JobsClient.create(element.dataset.kind,input);await showJob(job.id);toast('任务已提交，完成后回来查看');}finally{submit.disabled=false;}

@@ -1,0 +1,26 @@
+# Private two-person test gateway; keep OAuth files outside Git and public UI.
+# Use a dedicated model provider instead for a public commercial deployment.
+services:
+  gateway:
+    image: together-kitchen-gateway:private
+    restart: unless-stopped
+    mem_limit: 256m
+    environment:
+      NODE_OPTIONS: --max-old-space-size=160
+    extra_hosts: [host.docker.internal:host-gateway]
+    volumes:
+      - /opt/together-kitchen-private/gateway-configs:/app/configs
+      - gateway_logs:/app/logs
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    logging:
+      options: {max-size: 10m, max-file: '3'}
+  worker:
+    depends_on:
+      gateway:
+        condition: service_healthy
+volumes:
+  gateway_logs:
