@@ -123,3 +123,10 @@
 - 原生真实弹窗测试：没有草稿的提示位于最上层且可以交互，确认收藏后没有黑色成功提示。测试结束退出设备 QA 账号并按精确账号/家庭 ID 清理，其他用户和共享媒体保持。
 - 证据在忽略的 output/product-ui-acceptance.json、output/native-review-result.txt 与 output/playwright/*review*、*feedback*；新版 APK 位于 output/together-kitchen-android-debug.apk。
 - CI [38208869520](https://github.com/zhnuc/food_menu/actions/runs/38208869520) 后端、安卓和 iOS 三项全部通过（74 项 JavaScript、125 项 Python、容器启动）。iOS 已按新版交互重建模拟器产物，真机签名范围没有变化。
+
+## 小红书链接公开内容诊断 · 2026-10-12
+
+- 用户提供 xhslink.cn/o/160vtU2abGo；核对云端原任务 180e6ad2a88f467a88ea395d5afc5f8d，失败发生在素材取得阶段，未生成菜谱。
+- 分享链接正常解析至笔记 6a0846c4000000000603431d。服务器 Android/iPhone 请求均 HTTP 200，但 initial state 的 noteData.data 为空，没有正文、图片或视频；桌面请求跳转 /login。未发现能供解析的其他笔记结构。
+- 本机同样返回空笔记；同一服务器对之前 ABspPz2S93g 的对照请求仍取得正文、一张配图与视频，排除服务端端口关闭或提取器整体失效。本轮未调用模型、未重试用户任务、未调整额度或读取浏览器登录凭据。
+- 证据支持该链接当前未向未登录提取流程提供内容；不能据此断言笔记已删除，亦不能确认登录后是否可读取。现有图片/正文入口可补充原材料；登录内容支持仍未实现。本轮没有修改解析代码或将问题标记为已修复。
