@@ -118,4 +118,8 @@
 - 移除用户设置中的服务器连接和任务入口；原生地址只读取安装包 APP_API_URL，旧版 localStorage 可编辑地址不再参与连接。保留明确确认的离线退出本机账号功能。
 - 提示采用浏览器 top layer，并放入当前 modal 的 DOM 范围，解决普通 z-index 和外部 popover 仍被原生 dialog 屏蔽的问题；旧浏览器回退至 dialog 内。真实浏览器 elementFromPoint 验证可见、可交互。
 - 删除菜单更新、锁定、完成、准备、日常保存、头像保存等重复成功提示。保留错误、菜单锁定限制、未完成草稿为空等必要反馈；撤销准备仍在页面中。
-- 74 项 JavaScript 检查通过，覆盖当前弹窗自动完成、不自动收藏、断流部分结果、重复确认、关闭后的异步响应、固定地址和提示层级。隔离 FastAPI + worker 浏览器验证文字、图片、链接三类均在当前弹窗确认后保存，未调用模型；图片实际上传通过。当前正在构建安卓并准备云端部署。
+- 74 项 JavaScript 检查通过，覆盖当前弹窗自动完成、不自动收藏、断流部分结果、重复确认、关闭后的异步响应、固定地址和提示层级。隔离 FastAPI + worker 浏览器验证文字、图片、链接三类均在当前弹窗确认后保存，未调用模型；图片实际上传通过。
+- c522961 已推送并部署云端页面；更新 API 容器，保留正在运行的 worker，未中断其他用户的生成。Android APK 已重新构建安装；实际原生云端注册、贴小红书链接、当前弹窗预览、点击确认后增加一道收藏全部通过，确认前家庭菜谱数量保持不变。固定底部确认按钮在 390×844 视口和安卓 App 实际可见。
+- 原生真实弹窗测试：没有草稿的提示位于最上层且可以交互，确认收藏后没有黑色成功提示。测试结束退出设备 QA 账号并按精确账号/家庭 ID 清理，其他用户和共享媒体保持。
+- 证据在忽略的 output/product-ui-acceptance.json、output/native-review-result.txt 与 output/playwright/*review*、*feedback*；新版 APK 位于 output/together-kitchen-android-debug.apk。
+- CI [38208869520](https://github.com/zhnuc/food_menu/actions/runs/38208869520) 后端、安卓和 iOS 三项全部通过（74 项 JavaScript、125 项 Python、容器启动）。iOS 已按新版交互重建模拟器产物，真机签名范围没有变化。
