@@ -41,13 +41,13 @@ python database_tools.py import-sqlite /private-backups/accounts.sqlite3
 
 `python run.py` 启动 API 和 worker，按配置复用本机网关；`python server.py` 只启动 API，另开 `python worker.py`。SQLite 可用于本机验收，正式部署通过 `DATABASE_URL` 使用 PostgreSQL。
 
-安卓构建：安装 Node 22、Java 21 和 Android SDK 35，执行 `npm ci`、`python scripts/sync_native.py`、`npx cap sync android`，再在 android 目录运行 `gradlew assembleDebug`。`APP_API_URL` 指定服务端根地址，模拟器使用 `http://10.0.2.2:8767`，真实手机使用可访问的服务器地址。登录前可在 App 设置里修改连接地址；发布构建设置 `APP_RELEASE=1`，强制 HTTPS。
+安卓构建：安装 Node 22、Java 21 和 Android SDK 35，执行 `npm ci`、`python scripts/sync_native.py`、`npx cap sync android`，再在 android 目录运行 `gradlew assembleDebug`。`APP_API_URL` 指定服务端根地址，模拟器使用 `http://10.0.2.2:8767`，真实手机使用可访问的服务器地址。连接地址由 APP_API_URL 写入安装包，用户设置没有服务器配置入口；发布构建设置 `APP_RELEASE=1`，强制 HTTPS。
 
 调试 APK 适合安装测试。正式签名密钥、AAB、商店资料和发布流程尚需配置，私钥不入 Git。iOS 必须使用 macOS/Xcode，仓库 CI 会尝试无签名模拟器编译、安装、启动并留截图；模拟器 .app 不能当作 iPhone 可安装 IPA，真机/TestFlight 需要 Apple 开发者签名。
 
 离线支持已同步的菜谱、做饭记录、下载完成的照片和编辑草稿。后台按账号下载照片，网络中断可能留下待下载图片；共享库存与本餐写入仍需联网确认。退出清除该账号本地留档。
 
-原服务器无法连接且 App 显示离线时，可在「我的 → 设置 → 服务器连接」明确确认「退出本机，重新连接」。这会清除设备 Cookie 以及该账号的留档、照片和草稿，随后可设置新地址；云端数据保留，无法联系的旧服务器会话尚未撤销。在线时通过正常退出撤销服务端会话，再切换地址。
+App 固定连接构建时的服务地址，忽略旧版可编辑地址记录。在线退出会撤销会话并清除本地留档；原生 App 离线时也可以明确确认退出，清除设备 Cookie 和当前账号留档，云端数据保留。离线不能撤销服务端旧会话。地址变更由开发者维护构建配置和部署，用户界面不承担服务器管理。
 
 ## 尚待上线验证
 

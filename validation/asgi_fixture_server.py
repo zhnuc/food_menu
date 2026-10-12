@@ -10,7 +10,7 @@ ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
 from backend_fixture_server import fixture_parse
 from accounts import Accounts
 from job_service import Jobs
-from worker import run_once
+from worker import run_once, stable_recipes
 from application import create_app
 import uvicorn
 
@@ -21,7 +21,7 @@ if __name__=='__main__':
         os.environ['BLOB_ROOT']=str(Path(tmp)/'files')
         path=Path(tmp)/'accounts.db';store=Accounts(path);jobs=Jobs(store);stop=threading.Event()
         def process(job,jobs):
-            return fixture_parse(job['payload'],on_event=lambda kind,data:jobs.emit(job,kind,data))
+            return stable_recipes(job,fixture_parse(job['payload'],on_event=lambda kind,data:jobs.emit(job,kind,stable_recipes(job,data))))
         def work():
             while not stop.is_set():
                 if not run_once(jobs,process):stop.wait(.25)

@@ -27,15 +27,15 @@ test('home renders four main destinations with illustrated icons and a clean kit
   const ui=setup();assert.equal(ui.w.document.querySelectorAll('#navigation button').length,4);assert.equal(ui.w.document.querySelector('[data-konsta="app"]').dataset.uiTheme,'material-green');assert.ok(ui.w.document.querySelector('[data-konsta="tabbar"]'));assert.ok(ui.w.document.querySelector('[data-konsta="segmented"]'));assert.equal(ui.w.document.querySelectorAll('#navigation img').length,4);assert.match(ui.w.document.querySelector('.brand-mark img').src,/navigation\/v1\/128\/logo.png/);assert.match(ui.w.document.body.textContent,/冷藏上层/);assert.match(ui.w.document.body.textContent,/可用 500克/);ui.dom.window.close();
 });
 
-test('offline native connection recovery explains local deletion and opens server configuration after confirmation',async()=>{
+test('production native settings hide server configuration and permit explicit offline logout',async()=>{
   const shared=C.seed(),ui=setup(null,null,{user:{id:'offline',nickname:'离线',avatar:''},household:{id:'home',name:'家',invite:'CODE'},members:[],revision:1,snapshot:{state:shared,recipeData:{version:2,recipes:shared.recipes,evidence:{}}}});let disconnected=false;
   await new Promise(resolve=>setImmediate(resolve));
   ui.w.NativeBridge={native:()=>true,root:()=> 'https://old.example'};
   Object.assign(ui.w.AccountClient,{user:{id:'offline',nickname:'离线'},offline:true,disconnectLocal:async()=>{disconnected=true;ui.w.AccountClient.user=null;}});
-  ui.click('nav','page','mine');ui.click('settings');ui.click('server-settings');
-  assert.match(ui.w.document.querySelector('#sheet-body').textContent,/草稿，云端数据保留/);assert.equal(disconnected,false);
-  ui.click('account-disconnect');await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(disconnected,true);assert.equal(ui.w.document.querySelector('#sheet-title').textContent,'连接你的服务器');assert.equal(ui.w.document.querySelector('[name="url"]').value,'https://old.example');ui.dom.window.close();
+  ui.click('nav','page','mine');ui.click('settings');
+  assert.equal(ui.find('server-settings'),undefined);assert.equal(ui.find('jobs'),undefined);assert.equal(disconnected,false);
+  ui.click('account-logout');ui.click('confirm-logout');await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(disconnected,true);assert.equal(ui.w.document.querySelector('[name="url"]'),null);ui.dom.window.close();
 });
 
 test('meal diary gives a short inventory note rather than listing raw ingredients',()=>{
@@ -174,17 +174,66 @@ test('new storage and manual recipe work without destroying legacy evidence',()=
   ui.click('nav','page','recipes');ui.click('add-recipe');ui.click('manual');ui.submit({name:'我的鸡蛋',ingredientName:'鸡蛋',ingredientQuantity:2,ingredientUnit:'个',recipeStep:'煎熟'});
   assert.match(ui.w.document.body.textContent,/我的鸡蛋/);const legacy=JSON.parse(ui.w.localStorage.getItem('together-recipes'));assert.equal(legacy.version,2);const oldCard=legacy.recipes.find(row=>row.id==='old');assert.equal(oldCard.selected,true);assert.equal(oldCard.targetServings,3);assert.equal(legacy.evidence[oldCard.evidenceIds[0]].text,'番茄100克炒熟');ui.dom.window.close();
 });
-test('real parsing adapter receives stream groups before done and keeps saved results on truncation',async()=>{
+test('streamed recipes remain a review until confirmation, including partial results on truncation',async()=>{
   const ui=setup();let controller;
   const stream=new ReadableStream({start(value){controller=value;}});
   ui.w.fetch=async()=>new Response(stream,{headers:{'Content-Type':'application/x-ndjson'}});
   ui.click('nav','page','recipes');ui.click('add-recipe');ui.click('import');ui.submit({share:'https://example.com/public-recipe',article:''});
   const encoder=new TextEncoder();
-  assert.equal(ui.w.document.querySelector('[data-form="parse"] .button-primary').type,'submit');
+  assert.equal(ui.w.document.querySelector('#sheet-title').textContent,'正在整理菜谱');
   controller.enqueue(encoder.encode(JSON.stringify({type:'source',evidence:[{id:'ev-test',kind:'article',text:'番茄100克炒熟'}]})+'\n'));
   controller.enqueue(encoder.encode(JSON.stringify({type:'recipes',recipes:[{id:'parsed',name:'解析菜谱',servings:1,ingredients:[{name:'番茄',quantity:100,unit:'克'}],steps:['炒熟'],evidenceIds:['ev-test']}],completedGroups:1,totalGroups:2})+'\n'));
-  await new Promise(resolve=>setImmediate(resolve));assert.match(ui.w.document.querySelector('#screen').textContent,/解析菜谱/);assert.ok(ui.saved().recipeData.recipes.find(row=>row.id==='parsed'));
-  controller.close();await new Promise(resolve=>setImmediate(resolve));assert.match(ui.w.document.querySelector('#parse-progress').textContent,/连接中断/);assert.ok(ui.saved().recipeData.recipes.find(row=>row.id==='parsed'));ui.dom.window.close();
+  await new Promise(resolve=>setImmediate(resolve));assert.match(ui.w.document.querySelector('#sheet-body').textContent,/解析菜谱/);assert.ok(!ui.saved().recipeData.recipes.find(row=>row.id==='parsed'));assert.equal(ui.find('job-save'),undefined);
+  controller.close();await new Promise(resolve=>setImmediate(resolve));assert.match(ui.w.document.querySelector('.form-error').textContent,/连接中断/);assert.ok(!ui.saved().recipeData.recipes.find(row=>row.id==='parsed'));
+  ui.click('job-save');await new Promise(resolve=>setImmediate(resolve));assert.ok(ui.saved().recipeData.recipes.find(row=>row.id==='parsed'));assert.equal(ui.w.document.querySelector('#sheet').open,false);ui.dom.window.close();
+});
+
+test('successful visible menu and inventory changes do not open snackbars',()=>{
+  const ui=setup();ui.click('nav','page','recipes');ui.click('pick','id','demo-pepper');
+  assert.equal(ui.w.document.querySelector('#toast').hidden,true);
+  ui.click('nav','page','meal');ui.click('lock');assert.equal(ui.w.document.querySelector('#toast').hidden,true);
+  ui.click('nav','page','kitchen');ui.click('add-stock');ui.submit({name:'新的鸡蛋',quantity:2,unit:'个',location:'fridge:0'});
+  assert.equal(ui.w.document.querySelector('#toast').hidden,true);ui.dom.window.close();
+});
+
+test('non-popover fallback places error feedback inside the active modal',async()=>{
+  const ui=setup();ui.click('nav','page','mine');ui.click('settings');ui.click('resume-draft');
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(ui.w.document.querySelector('#toast').parentNode,ui.w.document.querySelector('#sheet'));
+  assert.equal(ui.w.document.querySelector('#toast').hidden,false);assert.match(ui.w.document.querySelector('#toast').textContent,/没有未完成/);ui.dom.window.close();
+});
+
+test('native API endpoint comes from the bundle and ignores the old editable override',()=>{
+  const ui=setup();ui.w.APP_API_URL='https://fixed.example';ui.w.localStorage.setItem('together-server-url','https://old.example');
+  ui.w.Capacitor={isNativePlatform:()=>true};ui.w.fetch=async()=>{};
+  ui.w.eval(fs.readFileSync(path.join(__dirname,'../web/native-bridge.js'),'utf8'));
+  assert.equal(ui.w.NativeBridge.root(),'https://fixed.example');assert.equal(ui.w.NativeBridge.setRoot,undefined);ui.dom.window.close();
+});
+
+test('cloud generation polls within the original sheet and saves only after one explicit confirmation',async()=>{
+  const shared=C.seed(),ui=setup(null,null,{user:{id:'review-user',nickname:'禾',avatar:''},household:{id:'review-home',name:'家',invite:'CODE'},members:[],revision:1,snapshot:{state:shared,recipeData:{version:2,recipes:shared.recipes,evidence:{}}}});
+  await new Promise(resolve=>setImmediate(resolve));
+  const card={id:'new-generated',name:'新的菜谱',servings:1,ingredients:[{name:'番茄',quantity:100,unit:'克'}],steps:['炒熟'],evidenceIds:['ev-test']};
+  let polled=0,created=0;const commands=[],timers=[];
+  ui.w.setTimeout=(callback,duration)=>{timers.push({callback,duration});return timers.length;};ui.w.clearTimeout=()=>{};
+  ui.w.JobsClient.create=async(kind,input)=>{created++;assert.equal(kind,'link');return {id:'cloud-job',status:'queued',result:{},events:[]};};
+  ui.w.JobsClient.get=async()=>{polled++;return {id:'cloud-job',status:'succeeded',result:{recipes:[card],evidence:[{id:'ev-test',kind:'article',text:'番茄100克炒熟'}]},events:[]};};
+  ui.w.AccountClient.command=async(kind,payload)=>{commands.push({kind,payload});};
+  ui.click('nav','page','recipes');ui.click('add-recipe');ui.click('import');ui.submit({share:'https://xhslink.cn/o/example',article:''});
+  await new Promise(resolve=>setImmediate(resolve));assert.equal(created,1);assert.equal(ui.w.document.querySelector('#sheet-title').textContent,'正在整理菜谱');assert.equal(commands.length,0);
+  await timers.find(timer=>timer.duration===1500).callback();
+  assert.equal(ui.w.document.querySelector('#sheet-title').textContent,'确认菜谱');assert.match(ui.w.document.querySelector('#sheet-body').textContent,/新的菜谱.*确认收藏/);assert.equal(commands.length,0);
+  ui.click('job-save');ui.click('job-save');await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(commands.length,1);assert.equal(commands[0].kind,'recipe.upsert');assert.equal(commands[0].payload.recipe.id,'new-generated');assert.equal(ui.w.document.querySelector('#sheet').open,false);assert.ok(polled>=2);ui.dom.window.close();
+});
+
+test('closing the create sheet does not let a delayed response replace settings',async()=>{
+  const shared=C.seed(),ui=setup(null,null,{user:{id:'delayed-user',nickname:'禾',avatar:''},household:{id:'delayed-home',name:'家',invite:'CODE'},members:[],revision:1,snapshot:{state:shared,recipeData:{version:2,recipes:shared.recipes,evidence:{}}}});
+  await new Promise(resolve=>setImmediate(resolve));let release;
+  ui.w.JobsClient.create=()=>new Promise(resolve=>{release=resolve;});
+  ui.click('nav','page','recipes');ui.click('add-recipe');ui.click('generate-text');ui.submit({prompt:'鸡蛋做一道菜'});ui.click('close');ui.click('nav','page','mine');ui.click('settings');
+  release({id:'delayed-job',status:'queued',result:{},events:[]});await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(ui.w.document.querySelector('#sheet-title').textContent,'设置');assert.equal(ui.w.document.querySelector('.generation-progress'),null);assert.equal(ui.find('server-settings'),undefined);ui.dom.window.close();
 });
 test('local storage failure rolls back stock changes and displays an error',()=>{
   const ui=setup();ui.click('add-stock');const before=ui.w.document.body.textContent;

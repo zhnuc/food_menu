@@ -15,6 +15,8 @@
   const safeAsset=value=>/^\/media\/[a-f0-9]{24}\/(?:frame-\d+\.jpg|image-\d+\.(?:jpg|png|webp))$/.test(value || '') ? value : '';
   const safeLink=value=>/^https?:\/\//i.test(value || '') ? value : '';
   let state,store,viewAccountId=null,bootError='',search='',recipeSearch='',randomRows=[],randomLocked=[],randomCount=2,photoRecord=null,toastTimer,parseBusy=false,parseMessage='',parseResume=null,swipe=null,lastSwipe=0,recipeDraft=null,profileDraft=null,calendarMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1),calendarDay='';
+  let sheetVersion=0,reviewTimer=null,activeReview=null,latestJob=null,localJob=null;
+  const savingJobs=new Set();
   try {
     const saved=JSON.parse(localStorage.getItem(KEY) || 'null');
     const original=RecipeData.createStore(JSON.parse(localStorage.getItem('together-recipes') || '[]'));
@@ -54,14 +56,30 @@
       localStorage.setItem('together-recipes',JSON.stringify(original.snapshot(original.recipes)));
     } catch(error) {toast('当前页面已保存，旧菜谱备份写入失败，请及时导出备份。');}
   }
-  function toast(message,undoId,duration=5000) {
+  function raiseToast() {
+    const target=$('toast');
+    if(target.hidePopover && target.matches(':popover-open'))target.hidePopover();
+    // A popover outside a modal is still inert, even in the browser top layer.
+    const parent=$('sheet').open?$('sheet'):document.body;if(target.parentNode!==parent)parent.append(target);
+    if(target.showPopover)target.showPopover();
+  }
+  function hideToast() {const target=$('toast');if(target.hidePopover && target.matches(':popover-open'))target.hidePopover();target.hidden=true;}
+  function toast(message,undoId,duration=3500) {
     clearTimeout(toastTimer);$('toast').hidden=false;
     $('toast').innerHTML=`<span>${esc(message)}</span>${undoId?`<button data-action="undo" data-id="${esc(undoId)}">撤销</button>`:A.pending?'<button data-action="retry-sync">重试同步</button>':''}`;
-    toastTimer=setTimeout(()=>{$('toast').hidden=true;},undoId?9000:duration);
+    raiseToast();toastTimer=setTimeout(hideToast,undoId?9000:duration);
   }
   function region(id,html){if(window.KonstaUI)window.KonstaUI.region(id,html);else $(id).innerHTML=html;}
-  function sheet(title,body) {$('sheet-title').textContent=title;if(window.KonstaUI)window.KonstaUI.sheet(body);else $('sheet-body').innerHTML=body;if(!$('sheet').open)$('sheet').showModal();$('sheet').scrollTop=0;}
-  function close() {$('sheet').close();}
+  function stopReview(){clearTimeout(reviewTimer);reviewTimer=null;activeReview=null;delete $('sheet').dataset.jobId;}
+  function sheet(title,body,jobId='') {
+    const same=jobId && $('sheet').open && $('sheet').dataset.jobId===jobId,scroll=same?$('sheet').scrollTop:0;
+    if(!same){sheetVersion++;stopReview();}
+    $('sheet-title').textContent=title;if(window.KonstaUI)window.KonstaUI.sheet(body);else $('sheet-body').innerHTML=body;
+    if(jobId)$('sheet').dataset.jobId=jobId;if(!$('sheet').open)$('sheet').showModal();$('sheet').scrollTop=scroll;
+    if(!$('toast').hidden)raiseToast();
+  }
+  function close() {sheetVersion++;stopReview();hideToast();$('sheet').close();}
+  $('sheet').addEventListener('close',()=>{sheetVersion++;stopReview();hideToast();document.body.append($('toast'));});
   const button=(label,action,extra='',style='button-primary')=>`<button class="${style}" data-action="${action}" ${extra}>${label}</button>`;
   const heading=(label,english,sub,action='')=>`<div class="page-heading"><div><p class="eyebrow">${english}</p><h1>${label}</h1><p class="subline">${sub}</p></div>${action}</div>`;
   function location(stock) {const space=state.spaces.find(row=>row.id===stock.space);return space ? `${space.name} · ${space.zones[stock.zone] || '未分区'}` : '未分配位置';}
@@ -113,7 +131,7 @@
   function recipesPage() {
     const locked=state.meal.status!=='draft';
     return heading(state.role==='chef'?'我们的菜谱':'今天想吃什么？','OUR LITTLE MENU',state.role==='chef'?'把喜欢的味道，留在这一本。':'点几道喜欢的，交给今天的主厨。',`<button class="circle-button" data-action="add-recipe" aria-label="新增菜谱">${icon('plus')}</button>`)+
-      `<div class="recipe-tools"><button data-action="random" aria-disabled="${locked}">${icon('dice')}不知道？随机一下</button><span class="count-note">${state.recipes.length} 道收藏</span></div>${locked?`<p class="lock-note">${icon('lock')}本餐菜单已固定，可以看做法，暂时不能继续点菜。</p>`:''}`+
+      `<div class="recipe-tools"><button data-action="random" aria-disabled="${locked}">${icon('dice')}不知道？随机一下</button><span class="count-note">${state.recipes.length} 道收藏</span></div>${A.user?'<button class="generation-history" data-action="jobs">生成记录 '+icon('arrow')+'</button>':''}${latestJob?`<button class="generation-notice" data-action="job-detail" data-id="${esc(latestJob.id)}"><span>${latestJob.status==='succeeded'?'菜谱已生成，确认后收藏':latestJob.status==='failed'?'这次生成需要处理':latestJob.status==='cancelled'?'生成已取消':'菜谱正在生成'}<small>${esc(jobStatus(latestJob.status))}</small></span>${icon('arrow')}</button>`:''}${locked?`<p class="lock-note">${icon('lock')}本餐菜单已固定，可以看做法，暂时不能继续点菜。</p>`:''}`+
       `<label class="search-box">${icon('search')}<input id="recipe-search" aria-label="搜索菜谱" value="${esc(recipeSearch)}" placeholder="搜菜名或食材…"></label>${parseBusy?`<p class="import-status">${esc(parseMessage || '正在整理新菜谱…')}</p>`:''}<div class="recipe-list" id="recipe-results">${recipeResults()}</div>`+
       `<div class="sticky-meal-link"><div><strong>${state.meal.selections.length?`已经选了 ${state.meal.selections.length} 道菜`:'给今天留一点期待'}</strong><small>${state.meal.status==='draft'?'选好后，去安排这一餐。':'本餐菜单与准备进度都在这里。'}</small></div><button data-action="nav" data-page="meal">看看这一餐</button></div>`;
   }
@@ -166,7 +184,7 @@
     const days=new Set(state.records.map(record=>dayKey(new Date(record.at)))).size;
     return heading('我的','LITTLE THINGS','把每一顿普通的饭，过成日子。')+`<div class="profile-card">${avatar(A.user)}<div class="profile-copy"><h2>${esc(A.user?.nickname || '本机体验')}</h2><p>${A.user?esc(A.household.name):'尚未登录 · 记录保存在本机'} · 当前是${state.role==='chef'?'主厨':'美食家'}</p></div><button class="profile-edit" data-action="${A.user?'edit-profile':'account-login'}">${A.user?'编辑':'登录'} ${icon('arrow')}</button></div>${A.user?`<p class="account-sync-note" role="status">${A.offline?'离线留档 · 家庭修改需联网':A.syncing?'正在保存到家庭…':'家庭记录已同步'}</p>`:''}<div class="profile-stats"><div><strong>${state.recipes.length}</strong><small>喜欢的菜</small></div><div><strong>${state.records.length}</strong><small>一起吃的餐</small></div><div><strong>${days}</strong><small>做饭的日子</small></div></div>${cookingCalendar()}<div class="settings-list"><button data-action="settings"><span>设置</span>${icon('arrow')}</button></div>`;
   }
-  function settings() {sheet('设置',`<div class="settings-list">${window.NativeBridge?.native()?'<button data-action="server-settings"><span>服务器连接</span>'+icon('arrow')+'</button>':''}<button data-action="${A.user?'edit-profile':'account-login'}"><span>${A.user?'头像与昵称':'登录或注册账号'}</span>${icon('arrow')}</button><button data-action="family"><span>家庭成员与邀请</span>${icon('arrow')}</button><button data-action="jobs"><span>菜谱生成任务</span>${icon('arrow')}</button><button data-action="resume-draft"><span>继续未完成的菜谱草稿</span>${icon('arrow')}</button><button data-action="export"><span>导出菜谱备份</span>${icon('arrow')}</button></div>${A.user?button('退出账号','account-logout','','delete-space-button'):''}`);}
+  function settings() {sheet('设置',`<div class="settings-list"><button data-action="${A.user?'edit-profile':'account-login'}"><span>${A.user?'头像与昵称':'登录或注册账号'}</span>${icon('arrow')}</button><button data-action="family"><span>家庭成员与邀请</span>${icon('arrow')}</button><button data-action="resume-draft"><span>继续未完成的菜谱草稿</span>${icon('arrow')}</button><button data-action="export"><span>导出菜谱备份</span>${icon('arrow')}</button></div>${A.user?button('退出账号','account-logout','','delete-space-button'):''}`);}
   function avatar(user) {return `<div class="avatar">${safeCover(user?.avatar)?`<img ${imageAttrs(user.avatar)} alt="${esc(user.nickname)}的头像">`:esc((user?.nickname || '食').slice(0,1))}</div>`;}
   function authSheet(register=false) {
     if(!A.available){sheet('账号服务尚未连接',`<p class="sheet-note">请在完整后端页面打开应用，或刷新后再试。</p>`);return;}
@@ -188,7 +206,7 @@
       } else if(type==='account-login')await A.authenticate('login',{login:values.login,password:values.password});
       else if(type==='account-profile'){if(profileDraft.busy)throw Error('头像正在处理，请稍等');await A.profile({nickname:values.nickname,avatar:profileDraft.avatar});}
       else if(type==='account-join')await A.join(values.code);
-      close();toast(type==='account-join'?'已加入家庭，厨房记录已同步':type==='account-profile'?'头像和昵称已保存':'登录成功');
+      close();
     } catch(error){element.querySelector('.form-error').textContent=error.message;}
     finally{submit.disabled=false;}
   }
@@ -322,64 +340,95 @@
     const dishes=record?.dishes || (state.meal.status==='draft'?C.draftDishes(state):state.meal.dishes);if(!dishes.length) throw Error('先选好这一餐的菜');
     makeMenuCard(dishes,record).then(image=>{shareImage=image;sheet(record?'分享这一餐':'分享本餐菜单',`<p class="sheet-note">${record?.photo?'成品照片、':''}菜单与日期，保存后可以发给喜欢的人。</p><img class="share-preview" src="${shareImage}" alt="可保存的菜单分享卡">${button('保存菜单图片','download-share')}`);}).catch(error=>toast('分享卡生成失败，请重试或更换照片。'));
   }
-  function importSheet() {sheet('把链接变成一道菜',`<p class="sheet-note">粘贴完整分享文本，或小红书、B站、抖音链接。识别完成的菜谱会逐组加入收藏。</p><form data-form="parse"><label class="field">链接或分享文本<textarea name="share" rows="4" required placeholder="粘贴想做的那道菜…" ${parseBusy?'disabled':''}></textarea></label><details><summary class="hint">也可以补充原帖正文</summary><label class="field">补充正文<textarea name="article" rows="3"></textarea></label></details><p class="form-error" role="alert"></p><button class="button-primary" ${parseBusy?'disabled':''}>${parseBusy?'正在生成…':'生成菜谱卡'}</button><p id="parse-progress" class="import-status" ${parseMessage?'':'hidden'}>${esc(parseMessage)}</p></form>`);}
+  function importSheet() {if(A.available && !A.user)return authSheet();sheet('把链接变成一道菜',`<p class="sheet-note">粘贴分享文本或链接，生成后在这里核对并确认收藏。</p><form data-form="parse"><label class="field">链接或分享文本<textarea name="share" rows="4" required placeholder="粘贴想做的那道菜…"></textarea></label><details><summary class="hint">也可以补充原帖正文</summary><label class="field">补充正文<textarea name="article" rows="3"></textarea></label></details><p class="form-error" role="alert"></p><button class="button-primary">生成菜谱卡</button></form>`);}
   function generationSheet(kind) {
     if(!A.user)return authSheet();
     if(A.offline)throw Error('生成菜谱需要联网');
     const title=kind==='image'?'识别菜谱图片':kind==='ingredients'?'用家里的食材想一道菜':'说说你想做什么';
     const input=kind==='image'?'<label class="field">菜谱图片<input name="image" type="file" accept="image/jpeg,image/png,image/webp" required></label>':kind==='ingredients'?`<label class="field">已有食材<textarea name="ingredients" rows="3" required>${esc(state.stocks.filter(row=>C.available(state,row)>0).map(row=>row.name).join('、'))}</textarea></label>`:'';
-    sheet(title,`<p class="sheet-note">${kind==='image'?'识别图片中的食材和做法文字，完成后请核对。':'AI 创作建议会保留在任务里，核对后再加入收藏。'}</p><form data-form="generate" data-kind="${kind}">${input}<label class="field">${kind==='text'?'想做什么':'补充要求（可选）'}<textarea name="prompt" rows="3" ${kind==='text'?'required':''} placeholder="例如：两个人的家常晚饭，少辣…"></textarea></label><p class="form-error" role="alert"></p><button class="button-primary">开始生成</button></form>`);
+    sheet(title,`<p class="sheet-note">${kind==='image'?'识别图片中的食材和做法文字，完成后在这里核对并收藏。':'生成建议后，在这里核对食材和做法，再确认收藏。'}</p><form data-form="generate" data-kind="${kind}">${input}<label class="field">${kind==='text'?'想做什么':'补充要求（可选）'}<textarea name="prompt" rows="3" ${kind==='text'?'required':''} placeholder="例如：两个人的家常晚饭，少辣…"></textarea></label><p class="form-error" role="alert"></p><button class="button-primary">开始生成</button></form>`);
   }
   const jobStatus=value=>({queued:'等待处理',running:'正在处理',succeeded:'已完成',failed:'需要重试',cancelled:'已取消'})[value] || value;
   async function showJobs() {
     if(!A.user)return authSheet();
+    const version=sheetVersion,account=A.user.id,family=A.household?.id;
     const {jobs}=await JobsClient.list();
-    sheet('菜谱生成任务',`<p class="sheet-note">关掉页面后仍在服务器处理。完成后打开任务，核对并收藏菜谱。</p><div class="settings-list">${jobs.map(job=>`<button data-action="job-detail" data-id="${esc(job.id)}"><span>${esc(({link:'链接整理',image:'图片识别',text:'文字创作',ingredients:'食材想菜'})[job.kind])}<small> · ${esc(jobStatus(job.status))}</small></span>${icon('arrow')}</button>`).join('') || '<p class="hint">还没有生成任务。</p>'}</div>`);
+    if(sheetVersion!==version || A.user?.id!==account || A.household?.id!==family)return;
+    sheet('生成记录',`<p class="sheet-note">关闭弹窗后，生成仍会继续。可以在这里打开之前的菜谱，核对后收藏。</p><div class="settings-list">${jobs.map(job=>`<button data-action="job-detail" data-id="${esc(job.id)}"><span>${esc(({link:'链接整理',image:'图片识别',text:'文字创作',ingredients:'食材想菜'})[job.kind])}<small> · ${esc(jobStatus(job.status))}</small></span>${icon('arrow')}</button>`).join('') || '<p class="hint">还没有生成记录。</p>'}</div>`);
+  }
+  function jobOutput(job) {
+    const events=job.events || [],evidence=job.result?.evidence?.length?job.result.evidence:events.filter(row=>row.type==='source').flatMap(row=>row.evidence || []);
+    const rows=job.result?.recipes?.length?job.result.recipes:events.filter(row=>row.type==='recipes').flatMap(row=>row.recipes || []);
+    return {evidence,cards:[...new Map(rows.map(row=>[row.id || JSON.stringify([row.name,row.source]),row])).values()]};
+  }
+  function presentJob(job,fetchError='') {
+    const {cards}=jobOutput(job),busy=['queued','running'].includes(job.status),saved=cards.length && cards.every(card=>state.recipes.some(row=>row.id===card.id));
+    const progress=(job.events || []).filter(row=>row.type==='progress' && row.message).at(-1)?.message || jobStatus(job.status);
+    latestJob=saved?null:{id:job.id,status:job.status};
+    const body=`<div class="generation-progress ${busy?'is-running':''}" role="status"><span class="generation-dot"></span><div><strong>${busy?esc(progress):saved?'已在你的菜谱里':cards.length?`已整理 ${cards.length} 道菜`:'这次还没有整理出菜谱'}</strong><p>${busy?'可以留在这里等待，关闭弹窗后也会继续处理。':cards.length?'确认食材和做法后，就会加入你的菜谱。':''}</p></div></div>${fetchError || job.error?`<p class="form-error" role="alert">${esc(fetchError || job.error)}</p>`:''}${(job.result?.warnings || []).map(row=>`<p class="hint">${esc(row)}</p>`).join('')}<div class="generated-recipes">${cards.map(card=>`<article class="generated-recipe"><div class="generated-recipe-heading"><img src="/assets/dishes/v1/256/default-dish.png" width="52" height="52" alt=""><h3>${esc(card.name)}</h3></div><div class="chips">${(card.ingredients || []).map(row=>`<span>${esc(row.name)}${row.quantity==null?'':` ${fmt(row.quantity)}${esc(displayUnit(row.unit))}`}</span>`).join('')}</div><ol>${(card.steps || []).map(step=>`<li>${esc(step)}</li>`).join('')}</ol></article>`).join('')}</div><div class="generation-actions">${cards.length && !busy && !saved?button(`确认收藏 · ${cards.length}道菜`,'job-save',`data-id="${esc(job.id)}"`):''}${busy?button('稍后再看','close','','button-secondary'):''}${job.status==='failed' && job.id!==localJob?.id?button('重新生成','job-retry',`data-id="${esc(job.id)}"`,'button-secondary'):''}${busy || fetchError?button('刷新进度','job-detail',`data-id="${esc(job.id)}"`,'text-link'):''}${!busy && !cards.length?'<p class="hint">可以重新添加链接、补充正文，或换一张有做法文字的图片。</p>':''}</div>`;
+    sheet(busy?'正在整理菜谱':cards.length?'确认菜谱':'添加菜谱',body,job.id);
+    render();
+  }
+  function watchJob(job) {
+    const review={id:job.id,account:A.user?.id,family:A.household?.id,signature:JSON.stringify(job)};activeReview=review;
+    if(job.id===localJob?.id || !['queued','running'].includes(job.status))return;
+    const poll=async()=>{
+      if(activeReview!==review || !$('sheet').open)return;
+      try {
+        const next=await JobsClient.get(review.id);
+        if(activeReview!==review || A.user?.id!==review.account || A.household?.id!==review.family)return;
+        const signature=JSON.stringify(next);if(signature!==review.signature){presentJob(next);review.signature=signature;}
+        if(!['queued','running'].includes(next.status))return;
+      } catch(error) {if(activeReview!==review)return;const target=$('sheet-body').querySelector('.generation-progress p');if(target)target.textContent='暂时无法更新进度，可以刷新或联网后在生成记录中查看。';}
+      if(activeReview===review)reviewTimer=setTimeout(poll,2000);
+    };
+    reviewTimer=setTimeout(poll,1500);
   }
   async function showJob(id) {
-    const job=await JobsClient.get(id),recipes=job.result.recipes || job.events.filter(row=>row.type==='recipes').flatMap(row=>row.recipes || []);
-    sheet('菜谱生成任务',`<p class="sheet-note">${esc(jobStatus(job.status))}${job.error?' · '+esc(job.error):''}</p>${(job.result.warnings || []).map(row=>`<p class="hint">${esc(row)}</p>`).join('')}${recipes.map(card=>`<section class="recipe-step-row"><h3>${esc(card.name)}</h3><p>${esc(card.ingredients?.map(row=>row.name).join('、'))}</p><ol>${(card.steps || []).map(step=>`<li>${esc(step)}</li>`).join('')}</ol></section>`).join('')}${recipes.length?button('核对好了，加入收藏','job-save',`data-id="${esc(id)}"`):''}${job.status==='failed'?button('重试任务','job-retry',`data-id="${esc(id)}"`,'button-secondary'):''}${['queued','running'].includes(job.status)?button('刷新进度','job-detail',`data-id="${esc(id)}"`,'button-secondary')+button('取消任务','job-cancel',`data-id="${esc(id)}"`,'button-secondary'):''}${button('返回任务列表','jobs','','button-secondary')}`);
+    const version=sheetVersion,account=A.user?.id,family=A.household?.id,job=id===localJob?.id?localJob:await JobsClient.get(id);
+    if(version!==sheetVersion || A.user?.id!==account || A.household?.id!==family)return;
+    clearTimeout(reviewTimer);presentJob(job);watchJob(job);
+  }
+  async function beginJob(kind,input,version=sheetVersion) {
+    const account=A.user?.id,family=A.household?.id,job=await JobsClient.create(kind,input);
+    if(A.user?.id!==account || A.household?.id!==family)throw Error('账号或家庭已切换，请在原家庭查看生成记录');
+    latestJob={id:job.id,status:job.status};render();
+    if(sheetVersion===version && $('sheet').open){presentJob(job);watchJob(job);}
   }
   async function saveJob(id) {
+    if(savingJobs.has(id))return;savingJobs.add(id);
     const account=A.user?.id,family=A.household?.id;
-    const job=await JobsClient.get(id),source=job.result.evidence || job.events.filter(row=>row.type==='source').flatMap(row=>row.evidence || []),cards=job.result.recipes || job.events.filter(row=>row.type==='recipes').flatMap(row=>row.recipes || []);
+    const submit=$('sheet-body').querySelector('[data-action="job-save"]');if(submit)submit.disabled=true;
+    try {
+    const job=id===localJob?.id?localJob:await JobsClient.get(id),{evidence:source,cards}=jobOutput(job);
+    if(['queued','running'].includes(job.status))throw Error('菜谱还在整理，请完成后确认收藏');
     let count=0;
     for(const raw of cards) {
       if(A.user?.id!==account || A.household?.id!==family)throw Error('账号或家庭已切换，请重新打开任务');
       if(state.recipes.some(row=>row.id===raw.id))continue;
       store.register(source);const card=oneRecipe(store.normalize(raw));
       await mutate('recipe.upsert',{recipe:card,evidence:Object.fromEntries(store.resolve(card).map(row=>[row.id,row]))},()=>state.recipes.unshift(card));count++;
+      rememberReal(card);
     }
-    close();toast(count?`已收藏 ${count} 道菜`:'这些菜谱已经在收藏里了');
+    latestJob=null;close();transact(()=>{state.page='recipes';},false);
+    } finally {savingJobs.delete(id);if(submit)submit.disabled=false;}
   }
   async function parseRecipes(body) {
     if(parseBusy) return;
-    const account=A.user?.id,family=A.household?.id;
-    parseBusy=true;let finished=null,count=0,parseEvidence=[];const key=JSON.stringify(body),run=parseResume?.key===key?parseResume:{key,ids:new Map()};
-    const status=message=>{parseMessage=message;const target=$('parse-progress');if(target){target.hidden=false;target.textContent=message;}if(state.page==='recipes')render();};
-    status('正在读取来源与识别图片…');
+    const account=A.user?.id,family=A.household?.id,version=sheetVersion;
+    parseBusy=true;
     try {
+      if(A.user){await beginJob('link',body,version);return;}
+      const job={id:'local-'+C.uid(),kind:'link',status:'running',result:{},events:[]};localJob=job;presentJob(job);watchJob(job);
       const consume=async event=>{
         if(A.user?.id!==account || A.household?.id!==family)throw Error('账号或家庭已切换，任务仍保留在原家庭');
-        if(event.type==='progress'&&event.message)status(event.message);
-        if(event.type==='source'){parseEvidence=event.evidence || [];store.register(parseEvidence);}
-        if(event.type==='recipes') {
-          for(const raw of event.recipes || []) {
-            store.register(parseEvidence);
-            const card=oneRecipe(store.normalize(raw)),identity=JSON.stringify([card.name,card.source,card.evidenceIds]);
-            const existing=run.ids.get(identity);
-            if(!existing || !state.recipes.some(row=>row.id===existing)) {await mutate('recipe.upsert',{recipe:card,evidence:Object.fromEntries(store.resolve(card).map(row=>[row.id,row]))},()=>state.recipes.unshift(card));rememberReal(card);run.ids.set(identity,card.id);}
-          }
-          count=run.ids.size;status(`已整理 ${count} 道菜，可以先去收藏里看。`);
-        }
-        if(event.type==='done')finished=event;
+        job.events.push(event);
+        if(event.type==='done'){job.status='succeeded';job.result.warnings=event.warnings || [];}
+        latestJob={id:job.id,status:job.status};
+        if(activeReview?.id===job.id && $('sheet').open)presentJob(job);else render();
       };
-      if(A.user){const job=await JobsClient.create('link',body);status('任务已提交，可以关闭页面；设置里可查看处理进度。');await JobsClient.follow(job.id,consume);}
-      else await RecipeStream.generate(body,consume);
-      parseResume=finished?.timings?.recipeFailedGroups?run:null;
-      status([finished?.recipeCount?`已生成 ${finished.recipeCount} 道菜。`:'暂时没取得足够依据，可以补充正文。',...(finished?.warnings || [])].join('\n'));
-    } catch(error) {parseResume=run;status(`${count?'已完成的菜谱已保存。\n':''}${error.message}`);}
-    finally {parseBusy=false;const submit=$('sheet-body').querySelector('[data-form="parse"] button[type="submit"], [data-form="parse"] .button-primary');if(submit){submit.disabled=false;submit.textContent='生成菜谱卡';}render();}
+      try{await RecipeStream.generate(body,consume);}catch(error){job.status='failed';job.error=error.message;if(activeReview?.id===job.id && A.user?.id===account)presentJob(job);}
+    } finally {parseBusy=false;const submit=$('sheet-body').querySelector('[data-form="parse"] .button-primary');if(submit)submit.disabled=false;render();}
   }
   document.addEventListener('click',async event=>{
     if(!event.target.closest('.select-control'))closeSelects();
@@ -396,8 +445,6 @@
       switch(d.action) {
         case 'close':close();break;
         case 'jobs':await showJobs();break;
-        case 'server-settings':if(A.user){if(!A.offline)throw Error('请先退出账号，再切换服务器');sheet('退出本机登录',`<p class="sheet-note">旧服务器暂时无法连接。退出本机会清除这个账号的本地留档、照片和草稿，云端数据保留；旧服务器上的会话要联网后才能撤销。</p>${button('退出本机，重新连接','account-disconnect','','delete-space-button')}`);break;}sheet('连接你的服务器',form(field('服务器地址','url',NativeBridge.root(),'url','required placeholder="https://你的域名"')+'<p class="hint">输入部署这套服务的地址，然后重新登录。</p>','server-settings'));break;
-        case 'account-disconnect':await A.disconnectLocal();sheet('连接你的服务器',form(field('服务器地址','url',NativeBridge.root(),'url','required placeholder="https://你的域名"')+'<p class="hint">输入部署这套服务的地址，然后重新登录。</p>','server-settings'));break;
         case 'job-detail':await showJob(d.id);break;
         case 'job-save':await saveJob(d.id);break;
         case 'job-retry':await JobsClient.action(d.id,'retry');await showJob(d.id);break;
@@ -409,13 +456,13 @@
         case 'role':transact(()=>{state.role=d.role;if(state.page==='kitchen'&&d.role==='foodie')state.page='recipes';},false);break;
         case 'space':transact(()=>{state.spaceIndex=Number(d.index);},false);break;
         case 'account-login':authSheet();break;
-        case 'retry-sync':await A.retryPending();toast('家庭操作已确认');break;
+        case 'retry-sync':await A.retryPending();break;
         case 'account-register':authSheet(true);break;
         case 'edit-profile':editProfile();break;
         case 'avatar-upload':$('account-avatar-file').click();break;
         case 'avatar-remove':profileDraft.avatar='';$('account-avatar-preview').innerHTML=avatar(profileDraft);break;
         case 'account-logout':sheet('退出当前账号？',`<p class="sheet-note">家庭记录会保留，重新登录后可以继续使用。</p>${button('继续使用','settings','','button-secondary')}${button('确认退出','confirm-logout','','delete-space-button')}`);break;
-        case 'confirm-logout':void A.logout().then(()=>{authSheet();toast('已退出账号');}).catch(error=>toast(error.message));break;
+        case 'confirm-logout':void (A.offline && window.NativeBridge?.native()?A.disconnectLocal():A.logout()).then(()=>authSheet()).catch(error=>toast(error.message));break;
         case 'copy-invite':void navigator.clipboard.writeText(A.household.invite).then(()=>toast('邀请码已复制')).catch(()=>toast('邀请码：'+A.household.invite));break;
         case 'stock':openStock(state.stocks.find(row=>row.id===d.id),d.originSpace?{space:d.originSpace,zone:Number(d.originZone)}:null);break;
         case 'zone-stocks':openZoneStocks(d.space,Number(d.zone));break;
@@ -426,7 +473,7 @@
         case 'add-space':openSpaceEditor();break;
         case 'layout':openSpaceEditor(d.id?state.spaces.find(row=>row.id===d.id):state.spaces[state.spaceIndex]);break;
         case 'delete-space':confirmDeleteSpace(d.id);break;
-        case 'confirm-delete-space':pending=mutate('space.delete',{spaceId:d.id},()=>C.deleteSpace(state,d.id));if(pending?.then)await pending;close();toast('空间已删除，食材记录已保留');break;
+        case 'confirm-delete-space':pending=mutate('space.delete',{spaceId:d.id},()=>C.deleteSpace(state,d.id));if(pending?.then)await pending;close();break;
         case 'select-toggle':{event.preventDefault();const control=target.closest('.select-control'),options=control.querySelector('.select-options'),opening=options.hidden;closeSelects();options.hidden=!opening;target.setAttribute('aria-expanded',String(opening));if(opening)options.querySelector('[aria-selected="true"]').focus();break;}
         case 'select-option':{event.preventDefault();const control=target.closest('.select-control'),select=control.querySelector('select'),trigger=control.querySelector('.select-trigger');select.value=d.value;closeSelects();syncSelect(select);trigger.focus();select.dispatchEvent(new Event('change',{bubbles:true}));break;}
         case 'ingredient-toggle':{const control=target.closest('.ingredient-control'),options=control.querySelector('.ingredient-options'),opening=options.hidden;document.querySelectorAll('.ingredient-options').forEach(row=>{row.hidden=true;row.closest('.ingredient-control').querySelector('[data-action="ingredient-toggle"]').setAttribute('aria-expanded','false');});options.hidden=!opening;target.setAttribute('aria-expanded',String(opening));if(opening){const initial=control.querySelector('[data-ingredient-icon]').value==='category-other';options.querySelector(initial?'[role="option"]':'[aria-selected="true"]').focus();}break;}
@@ -439,17 +486,17 @@
         case 'recipe-cover-remove':recipeDraft.coverImage='';$('recipe-cover-preview').innerHTML=coverEditor();void saveRecipeDraft();break;
         case 'recipe':openRecipe(state.recipes.find(row=>row.id===d.id));break;
         case 'meal-recipe':openRecipe(state.meal.dishes.find(row=>row.id===d.id),true);break;
-        case 'pick':pending=mutate('meal.pick',{recipeId:d.id,selected:!state.meal.selections.some(row=>row.recipeId===d.id)},()=>C.toggleDish(state,d.id));if(pending?.then)await pending;if($('sheet').open)close();toast('本餐菜单已更新');break;
+        case 'pick':pending=mutate('meal.pick',{recipeId:d.id,selected:!state.meal.selections.some(row=>row.recipeId===d.id)},()=>C.toggleDish(state,d.id));if(pending?.then)await pending;if($('sheet').open)close();break;
         case 'servings':{const row=state.meal.selections.find(row=>row.recipeId===d.id),servings=Math.max(0.5,row.servings+Number(d.delta));pending=mutate('meal.servings',{recipeId:d.id,servings},()=>C.setServings(state,d.id,servings));if(pending?.then)await pending;break;}
-        case 'lock':pending=mutate('meal.lock',{},()=>C.lock(state));if(pending?.then)await pending;toast('菜单确定了，开始准备这一餐吧');break;
+        case 'lock':pending=mutate('meal.lock',{},()=>C.lock(state));if(pending?.then)await pending;break;
         case 'prepare':openPrepare(d.id,d.type);break;
-        case 'declare':pending=mutate('meal.declare',{needId:d.id},()=>C.declare(state,d.id));if(pending?.then)await pending;close();toast('已标记备好，没有猜数量扣库存');break;
-        case 'undo':pending=mutate('meal.undo',{operationId:d.id},()=>C.undo(state,d.id));if(pending?.then)await pending;toast('刚才的操作已撤销');break;
+        case 'declare':pending=mutate('meal.declare',{needId:d.id},()=>C.declare(state,d.id));if(pending?.then)await pending;close();break;
+        case 'undo':pending=mutate('meal.undo',{operationId:d.id},()=>C.undo(state,d.id));if(pending?.then)await pending;break;
         case 'begin':pending=mutate('meal.begin',{},()=>C.begin(state));if(pending?.then)await pending;break;
-        case 'finish':pending=mutate('meal.finish',{},()=>C.finish(state));if(pending?.then)await pending;toast('已记进做饭日历');break;
+        case 'finish':pending=mutate('meal.finish',{},()=>C.finish(state));if(pending?.then)await pending;break;
         case 'new-meal':pending=mutate('meal.new',{},()=>C.newMeal(state));if(pending?.then)await pending;break;
         case 'cancel-meal':sheet('这餐先不做了？',`<p class="sheet-note">留给这餐的食材会恢复可用，已经补录的食材仍留在厨房。</p>${button('确认取消这一餐','confirm-cancel','','button-secondary orange')}`);break;
-        case 'confirm-cancel':pending=mutate('meal.cancel',{},()=>C.cancel(state));if(pending?.then)await pending;close();toast('本餐已取消，预留已释放');break;
+        case 'confirm-cancel':pending=mutate('meal.cancel',{},()=>C.cancel(state));if(pending?.then)await pending;close();break;
         case 'random':randomSheet();break;
         case 'random-lock':randomLocked=randomLocked.includes(d.id)?randomLocked.filter(id=>id!==d.id):[...randomLocked,d.id];randomSheet(true);break;
         case 'reroll':randomRows=C.sample(state.recipes,randomCount,randomLocked);randomSheet(true);break;
@@ -484,15 +531,14 @@
     if(!A.ready || A.syncing){element.querySelector('.form-error').textContent='正在同步，请稍后再保存';return;}
     try {
       let pending;
-      if(type==='server-settings'){if(A.user)throw Error('请先退出账号');NativeBridge.setRoot(values.url);window.location.reload();return;}
       if(type==='generate') {
-        const submit=element.querySelector('.button-primary');submit.disabled=true;
-        try{const input={prompt:values.prompt || ''};if(element.dataset.kind==='image')input.image=await JobsClient.upload(values.image);if(element.dataset.kind==='ingredients')input.ingredients=values.ingredients;const job=await JobsClient.create(element.dataset.kind,input);await showJob(job.id);toast('任务已提交，完成后回来查看');}finally{submit.disabled=false;}
+        const submit=element.querySelector('.button-primary'),version=sheetVersion;submit.disabled=true;
+        try{const input={prompt:values.prompt || ''};if(element.dataset.kind==='image')input.image=await JobsClient.upload(values.image);if(element.dataset.kind==='ingredients')input.ingredients=values.ingredients;await beginJob(element.dataset.kind,input,version);}finally{submit.disabled=false;}
         return;
       }
       if(type==='parse') {element.querySelector('.button-primary').disabled=true;await parseRecipes(values);return;}
       if(type==='join') {toast('这是邀请流程预览，真实账号与入组下一轮接入。');return;}
-      if(type==='prepare') {let op=mutate('meal.prepare',{needId:element.dataset.id,direction:element.dataset.type,quantity:values.quantity,unit:values.unit},()=>C.prepare(state,element.dataset.id,element.dataset.type,values.quantity,values.unit));if(op?.then)op=await op;close();toast(`已记录 ${fmt(op.quantity)}${esc(values.unit || state.meal.needs.find(row=>row.id===op.needId)?.unit || '')}`,op.id);return;}
+      if(type==='prepare') {let op=mutate('meal.prepare',{needId:element.dataset.id,direction:element.dataset.type,quantity:values.quantity,unit:values.unit},()=>C.prepare(state,element.dataset.id,element.dataset.type,values.quantity,values.unit));if(op?.then)op=await op;close();return;}
       if(type==='add-stock') {const [space,zone]=values.location.split(':'),input={...values,space:space==='unplaced'?null:space,zone:Number(zone || 0)};pending=mutate('stock.add',input,()=>C.addStock(state,input));if(pending?.then)await pending;}
       if(type==='reduce-stock') {pending=mutate('stock.reduce',{stockId:element.dataset.id,quantity:values.quantity},()=>C.reduceStock(state,element.dataset.id,values.quantity));if(pending?.then)await pending;}
       if(type==='move-stock') {const [space,zone]=values.location.split(':'),input={stockId:element.dataset.id,space:space==='unplaced'?null:space,zone:Number(zone || 0)};pending=mutate('stock.move',input,()=>C.moveStock(state,input.stockId,input.space,input.zone));if(pending?.then)await pending;}
@@ -509,7 +555,7 @@
         pending=mutate('recipe.upsert',{recipe:card,evidence:Object.fromEntries(store.resolve(card).map(row=>[row.id,row]))},()=>{const index=state.recipes.findIndex(row=>row.id===card.id);if(index<0)state.recipes.unshift(card);else state.recipes[index]=card;});if(pending?.then)await pending;if(!card.id.startsWith('demo-'))rememberReal(card);
         void window.LocalCache?.removeDraft(draftOwner());
       }
-      close();toast('已经记下了');
+      close();
     } catch(error) {element.querySelector('.form-error').textContent=error.message;}
   });
   document.addEventListener('input',event=>{
@@ -548,7 +594,7 @@
       if(!file.type.startsWith('image/'))throw Error('请选择图片');
       url=URL.createObjectURL(file);const image=new Image();image.src=url;await image.decode();
       const scale=Math.min(1,900/Math.max(image.width,image.height)),canvas=document.createElement('canvas');canvas.width=Math.round(image.width*scale);canvas.height=Math.round(image.height*scale);canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
-      const photo=canvas.toDataURL('image/jpeg',.72);await mutate('record.photo',{recordId,photo},()=>{const record=state.records.find(row=>row.id===recordId);if(!record)throw Error('本餐记录不存在');record.photo=photo;});showRecord(state.records.find(row=>row.id===recordId));toast(A.user?'照片已保存到家庭记录':'照片已留在本机的做饭记录里');
+      const photo=canvas.toDataURL('image/jpeg',.72);await mutate('record.photo',{recordId,photo},()=>{const record=state.records.find(row=>row.id===recordId);if(!record)throw Error('本餐记录不存在');record.photo=photo;});showRecord(state.records.find(row=>row.id===recordId));
     } catch(error){toast(error.message || '这张图片暂时无法读取，请换一张');}
     finally{if(url)URL.revokeObjectURL(url);event.target.value='';}
   });
@@ -571,18 +617,18 @@
     lastSwipe=Date.now();try{if(item.need)openPrepare(item.need,dx<0?'left':'right');else transact(()=>{state.spaceIndex=(state.spaceIndex+(dx<0?1:-1)+state.spaces.length)%state.spaces.length;},false);}catch(error){toast(error.message);}
   });
   document.addEventListener('pointercancel',()=>{if(swipe){swipe.element.style.transform='';swipe.element.style.transition='';}swipe=null;});
-  window.addEventListener('storage',event=>{if(A.user || event.key!==KEY || !event.newValue)return;try{const saved=JSON.parse(event.newValue);store=RecipeData.createStore(saved.recipeData);state={...saved.state,recipes:store.recipes};render();toast('另一个本机页面的体验进度已更新');}catch{toast('本机页面同步失败，请刷新后核对');}});
+  window.addEventListener('storage',event=>{if(A.user || event.key!==KEY || !event.newValue)return;try{const saved=JSON.parse(event.newValue);store=RecipeData.createStore(saved.recipeData);state={...saved.state,recipes:store.recipes};render();}catch{toast('本机页面同步失败，请刷新后核对');}});
   void A.start({
     apply(data) {
       let view={role:state.role,page:state.page,spaceIndex:state.spaceIndex};
-      if(viewAccountId!==A.user.id){try{const cached=JSON.parse(localStorage.getItem('together-account-cache-'+A.user.id));if(cached?.state)view={role:cached.state.role==='foodie'?'foodie':'chef',page:['kitchen','recipes','meal','mine'].includes(cached.state.page)?cached.state.page:'kitchen',spaceIndex:Number.isInteger(cached.state.spaceIndex)?cached.state.spaceIndex:0};}catch(_){}viewAccountId=A.user.id;}
+      if(viewAccountId!==A.user.id){latestJob=null;localJob=null;try{const cached=JSON.parse(localStorage.getItem('together-account-cache-'+A.user.id));if(cached?.state)view={role:cached.state.role==='foodie'?'foodie':'chef',page:['kitchen','recipes','meal','mine'].includes(cached.state.page)?cached.state.page:'kitchen',spaceIndex:Number.isInteger(cached.state.spaceIndex)?cached.state.spaceIndex:0};}catch(_){}viewAccountId=A.user.id;}
       store=RecipeData.createStore(data.recipeData);
       state={...data.state,...view,recipes:store.recipes.map(card=>store.normalize(oneRecipe(card)))};
       state.stocks=state.stocks.map(stock=>({...stock,iconId:fixedIcon(stock)}));
       persist();
     },
     guest() {
-      close();viewAccountId=null;search='';recipeSearch='';randomRows=[];randomLocked=[];parseResume=null;profileDraft=null;
+      close();viewAccountId=null;search='';recipeSearch='';randomRows=[];randomLocked=[];parseResume=null;profileDraft=null;latestJob=null;localJob=null;
       let saved;try{saved=JSON.parse(localStorage.getItem(KEY) || 'null');}catch(_){}
       const initial=saved?.state || C.seed();store=RecipeData.createStore(saved?.recipeData || initial.recipes);
       state={...initial,recipes:store.recipes,page:'mine'};
